@@ -75,6 +75,8 @@ def build_app(seq: Sequencer, web_dir, midi_in=None):
                 mapper.open_port(port)
             else:
                 mapper.close_port()
+        elif t == "midi_set_out":
+            seq.set_midi_out(msg.get("port") or None)
         elif t == "midi_learn":
             mapper.set_learn(msg.get("action", "swing"))
         elif t == "midi_learn_cancel":

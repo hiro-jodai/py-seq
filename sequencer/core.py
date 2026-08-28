@@ -154,12 +154,37 @@ class Sequencer:
     def _send_note_on(self, channel, note, vel):
         if self.out is None:
             return
-        self.out.send(mido.Message("note_on", channel=channel, note=note, velocity=vel))
+        try:
+            self.out.send(mido.Message("note_on", channel=channel, note=note, velocity=vel))
+        except Exception:
+            pass
 
     def _send_note_off(self, channel, note):
         if self.out is None:
             return
-        self.out.send(mido.Message("note_off", channel=channel, note=note, velocity=0))
+        try:
+            self.out.send(mido.Message("note_off", channel=channel, note=note, velocity=0))
+        except Exception:
+            pass
+
+    def set_midi_out(self, name):
+        """Re-open the MIDI output port at runtime (None closes it)."""
+        if self.out is not None:
+            try:
+                self.out.close()
+            except Exception:
+                pass
+            self.out = None
+        if name:
+            try:
+                self.out = mido.open_output(name)
+                self.port_label = name
+            except Exception as e:
+                self.out = None
+                self.port_label = f"error: {e}"
+        else:
+            self.port_label = "closed"
+        self.notify_state()
 
     def _all_notes_off(self):
         for ch, (note, _until) in self._note_offs.items():
@@ -428,6 +453,10 @@ class Sequencer:
 
     # ------------------------------------------------------------------ state
     def get_state(self):
+        try:
+            midi_outs = mido.get_output_names()
+        except Exception:
+            midi_outs = []
         tracks = []
         for i, tr in enumerate(self.tracks):
             steps = [
@@ -463,6 +492,8 @@ class Sequencer:
             "humanize_time": self.humanize_time,
             "humanize_velocity": self.humanize_velocity,
             "midi_port": self.port_label,
+            "midi_out": self.port_label,
+            "midi_outs": midi_outs,
             "tracks": tracks,
         }
 

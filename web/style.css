@@ -103,6 +103,7 @@ input[type="number"] {
   white-space: nowrap;
 }
 .map-chip:hover { border-color: var(--accent); }
+.midi-bar .sep { color: var(--dim); margin: 0 4px; }
 
 #grid { min-width: 980px; }
 .track { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; }

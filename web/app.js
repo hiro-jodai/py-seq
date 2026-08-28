@@ -91,6 +91,23 @@ function render() {
   $("midiInLabel").textContent = state.midi_in || (state.midi_error ? `err: ${state.midi_error}` : "no port");
   $("midiLearnBtn").classList.toggle("active", state.learn_mode);
   $("midiLearnBtn").textContent = state.learn_mode ? "LEARN…" : "LEARN";
+
+  // MIDI OUT selector
+  const outSel = $("midiOutSelect");
+  const outOpts = outSel.options;
+  if (outOpts.length !== state.midi_outs.length ||
+      (state.midi_outs.length > 0 && outOpts[0] && outOpts[0].value !== state.midi_outs[0])) {
+    outSel.innerHTML = "";
+    state.midi_outs.forEach((p) => {
+      const opt = document.createElement("option");
+      opt.value = p;
+      opt.textContent = p;
+      outSel.appendChild(opt);
+    });
+  }
+  const outCur = state.midi_out || "";
+  if (state.midi_outs.includes(outCur)) outSel.value = outCur;
+  $("midiOutLabel").textContent = state.midi_out || "no output";
   const mapList = $("midiMapList");
   mapList.innerHTML = "";
   state.mapping.forEach((m) => {
@@ -248,6 +265,7 @@ $("probSlider").oninput = (e) => { $("probSliderVal").textContent = e.target.val
 $("songBtn").onclick = () => send({ type: "toggle_song" });
 $("songLenInput").onchange = (e) => send({ type: "set_song_len", value: parseInt(e.target.value) });
 $("midiOpenBtn").onclick = () => send({ type: "midi_set_port", port: $("midiPortSelect").value });
+$("midiOutOpenBtn").onclick = () => send({ type: "midi_set_out", port: $("midiOutSelect").value });
 $("midiLearnBtn").onclick = () => {
   if (state.learn_mode) send({ type: "midi_learn_cancel" });
   else send({ type: "midi_learn", action: $("midiActionSelect").value });
