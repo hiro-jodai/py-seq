@@ -41,6 +41,30 @@ async def main():
         s = await recv_until(ws, lambda m: m["type"] == "state" and m["tracks"][3]["steps"] != prev)
         print("randomize_track OK")
 
+        # swing
+        await ws.send(json.dumps({"type": "set_swing", "value": 40}))
+        s = await recv_until(ws, lambda m: m["type"] == "state" and m["swing"] == 40)
+        print("swing OK")
+
+        # pattern switch
+        await ws.send(json.dumps({"type": "set_pattern", "index": 2}))
+        s = await recv_until(ws, lambda m: m["type"] == "state" and m["current_pattern"] == 2)
+        assert s["pattern_length"] == s["pattern_length"]
+        print("pattern switch OK (P%d, bars=%d)" % (s["current_pattern"] + 1, s["pattern_length"]))
+        await ws.send(json.dumps({"type": "set_pattern", "index": 0}))
+        await recv_until(ws, lambda m: m["type"] == "state" and m["current_pattern"] == 0)
+
+        # song entry + song mode
+        await ws.send(json.dumps({"type": "set_song_entry", "index": 1, "pattern": 2}))
+        s = await recv_until(ws, lambda m: m["type"] == "state" and m["song"][1] == 2)
+        print("song entry OK")
+        await ws.send(json.dumps({"type": "toggle_song"}))
+        s = await recv_until(ws, lambda m: m["type"] == "state" and m["song_on"] is True)
+        print("song on OK")
+        await ws.send(json.dumps({"type": "toggle_song"}))
+        await recv_until(ws, lambda m: m["type"] == "state" and m["song_on"] is False)
+        print("song off OK")
+
         # stop
         await ws.send(json.dumps({"type": "toggle_play"}))
         s = await recv_until(ws, lambda m: m["type"] == "state" and m["playing"] is False)

@@ -29,7 +29,15 @@ def build_app(seq: Sequencer, web_dir):
 
     seq.set_state_listener(lambda: broadcast({"type": "state", **seq.get_state()}))
     seq.set_step_listener(
-        lambda bar, step: broadcast({"type": "step", "bar": bar, "step": step})
+        lambda bar, step: broadcast(
+            {
+                "type": "step",
+                "bar": bar,
+                "step": step,
+                "pattern": seq.current_pattern,
+                "song_pos": seq._song_entry if seq.song_on else -1,
+            }
+        )
     )
 
     def handle(msg):
@@ -42,6 +50,19 @@ def build_app(seq: Sequencer, web_dir):
             seq.toggle_play()
         elif t == "set_bpm":
             seq.set_bpm(msg.get("value", 120))
+        elif t == "set_swing":
+            seq.set_swing(msg.get("value", 0))
+        elif t == "set_pattern":
+            seq.set_pattern(msg.get("index", 0))
+        elif t == "set_song_entry":
+            seq.set_song_entry(msg.get("index", 0), msg.get("pattern", 0))
+        elif t == "set_song_len":
+            seq.set_song_len(msg.get("value", 4))
+        elif t == "toggle_song":
+            seq.toggle_song()
+        elif t == "set_song_on":
+            if seq.song_on != bool(msg.get("on", True)):
+                seq.toggle_song()
         elif t == "set_pattern_length":
             seq.set_pattern_length(msg.get("value", 1))
         elif t == "set_edit_bar":

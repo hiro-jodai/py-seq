@@ -32,6 +32,9 @@ button.active { background: var(--accent); color: #06121a; border-color: var(--a
 button.big { font-size: 18px; min-width: 52px; }
 button.rec.active { background: var(--red); color: #fff; border-color: var(--red); }
 button.prob.active { background: #fbbf24; color: #1a1204; border-color: #fbbf24; }
+button.song.active { background: #34d399; color: #04120c; border-color: #34d399; }
+button.pat.active { background: var(--accent); color: #06121a; border-color: var(--accent); }
+.pat-box { display: flex; gap: 6px; }
 
 header {
   display: flex;
@@ -125,6 +128,24 @@ input[type="number"] {
 .cell.live { box-shadow: 0 0 0 2px #fff, 0 0 14px var(--c); transform: scale(1.05); }
 .cell.off .prob { opacity: .3; }
 .prob { pointer-events: none; }
+
+.song-row { margin-top: 14px; }
+.song-label {
+  width: 250px;
+  flex-shrink: 0;
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 2px;
+  color: var(--dim);
+  text-align: left;
+  padding-left: 4px;
+}
+.pat-cell {
+  font-size: 12px;
+  font-weight: 700;
+  background: #141a24;
+}
+.song-row.dim .pat-cell { opacity: .45; }
 
 footer {
   margin-top: 18px;

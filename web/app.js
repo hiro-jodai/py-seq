@@ -12,7 +12,7 @@ const TRACK_COLORS = ["#22d3ee", "#f472b6", "#fbbf24", "#a78bfa"];
 
 let state = null;
 let probMode = false;
-let live = { bar: 0, step: -1 };
+let live = { bar: 0, step: -1, pattern: 0, songPos: -1 };
 let ws = null;
 
 function connect() {
@@ -21,7 +21,11 @@ function connect() {
     let msg;
     try { msg = JSON.parse(e.data); } catch { return; }
     if (msg.type === "state") { state = msg; render(); }
-    else if (msg.type === "step") { live.bar = msg.bar; live.step = msg.step; renderLive(); }
+    else if (msg.type === "step") {
+      live.bar = msg.bar; live.step = msg.step;
+      live.pattern = msg.pattern; live.songPos = msg.song_pos;
+      renderLive();
+    }
   };
   ws.onclose = () => setTimeout(connect, 1000);
 }
@@ -36,6 +40,8 @@ function render() {
   $("bpmInput").value = state.bpm;
   $("barLabel").textContent = `bar ${state.edit_bar + 1}/${state.pattern_length}`;
   $("lenInput").value = state.pattern_length;
+  $("swingRange").value = state.swing;
+  $("swingVal").textContent = `${state.swing}%`;
   $("humanizeTime").value = state.humanize_time;
   $("humanizeTimeVal").textContent = `${state.humanize_time}ms`;
   $("humanizeVel").value = state.humanize_velocity;
@@ -44,6 +50,11 @@ function render() {
   $("autoCount").textContent = `aut:${state.automation_count}`;
   $("midiLabel").textContent = `midi: ${state.midi_port}`;
   $("probModeBtn").classList.toggle("active", probMode);
+  $("songBtn").classList.toggle("active", state.song_on);
+  $("songLenInput").value = state.song_len;
+  ["p1", "p2", "p3", "p4"].forEach((id, i) => {
+    $(id).classList.toggle("active", i === state.current_pattern);
+  });
 
   const grid = $("grid");
   grid.innerHTML = "";
@@ -111,12 +122,37 @@ function render() {
     row.appendChild(cells);
     grid.appendChild(row);
   });
+
+  // song row
+  const songRow = document.createElement("div");
+  songRow.className = "track song-row" + (state.song_on ? "" : " dim");
+  const songLabel = document.createElement("span");
+  songLabel.className = "song-label";
+  songLabel.textContent = "SONG";
+  songRow.appendChild(songLabel);
+  const songCells = document.createElement("div");
+  songCells.className = "cells";
+  for (let i = 0; i < state.song.length; i++) {
+    const c = document.createElement("div");
+    const pat = state.song[i];
+    c.className = "cell pat-cell";
+    c.style.setProperty("--c", TRACK_COLORS[pat]);
+    c.textContent = pat + 1;
+    c.dataset.songIdx = i;
+    c.addEventListener("click", () => {
+      const nxt = (state.song[i] + 1) % 4;
+      send({ type: "set_song_entry", index: i, pattern: nxt });
+    });
+    songCells.appendChild(c);
+  }
+  songRow.appendChild(songCells);
+  grid.appendChild(songRow);
   renderLive();
 }
 
 function renderLive() {
   if (!state) return;
-  const rows = document.querySelectorAll(".track");
+  const rows = document.querySelectorAll(".track:not(.song-row)");
   rows.forEach((rowEl) => {
     rowEl.querySelectorAll(".cell").forEach((c) => {
       const si = parseInt(c.dataset.step);
@@ -124,6 +160,16 @@ function renderLive() {
       c.classList.toggle("live", playing);
     });
   });
+  // pattern + song position indicators
+  ["p1", "p2", "p3", "p4"].forEach((id, i) => {
+    $(id).classList.toggle("active", i === live.pattern);
+  });
+  const songRow = document.querySelector(".song-row");
+  if (songRow) {
+    songRow.querySelectorAll(".pat-cell").forEach((c) => {
+      c.classList.toggle("live", state.playing && parseInt(c.dataset.songIdx) === live.songPos);
+    });
+  }
   $("posLabel").textContent = state.playing ? `${live.bar + 1}:${live.step + 1}` : "--";
 }
 
@@ -133,6 +179,10 @@ $("bpmInput").onchange = (e) => send({ type: "param", param: "bpm", value: parse
 $("barPrev").onclick = () => send({ type: "set_edit_bar", value: state.edit_bar - 1 });
 $("barNext").onclick = () => send({ type: "set_edit_bar", value: state.edit_bar + 1 });
 $("lenInput").onchange = (e) => send({ type: "set_pattern_length", value: parseInt(e.target.value) });
+$("swingRange").oninput = (e) => {
+  $("swingVal").textContent = `${e.target.value}%`;
+  send({ type: "set_swing", value: parseInt(e.target.value) });
+};
 $("humanizeTime").oninput = (e) => {
   $("humanizeTimeVal").textContent = `${e.target.value}ms`;
   send({ type: "set_humanize", time_ms: parseInt(e.target.value) });
@@ -145,6 +195,11 @@ $("recBtn").onclick = () => send({ type: state.recording ? "rec_off" : "rec_on" 
 $("clearAutoBtn").onclick = () => send({ type: "clear_automation" });
 $("probModeBtn").onclick = () => { probMode = !probMode; render(); };
 $("probSlider").oninput = (e) => { $("probSliderVal").textContent = e.target.value; };
+$("songBtn").onclick = () => send({ type: "toggle_song" });
+$("songLenInput").onchange = (e) => send({ type: "set_song_len", value: parseInt(e.target.value) });
+["p1", "p2", "p3", "p4"].forEach((id, i) => {
+  $(id).onclick = () => send({ type: "set_pattern", index: i });
+});
 
 window.addEventListener("keydown", (e) => {
   if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;

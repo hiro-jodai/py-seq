@@ -9,6 +9,12 @@
 <body>
 <header>
   <div class="brand">PI-SEQ<span class="blink">▮</span></div>
+  <div class="pat-box">
+    <button id="p1" class="pat">P1</button>
+    <button id="p2" class="pat">P2</button>
+    <button id="p3" class="pat">P3</button>
+    <button id="p4" class="pat">P4</button>
+  </div>
   <div class="transport">
     <button id="playBtn" class="big" title="space">▶</button>
     <div class="bpm-box">
@@ -24,10 +30,13 @@
     </div>
   </div>
   <div class="fx">
+    <label>SWING <input id="swingRange" type="range" min="0" max="100" value="0"> <span id="swingVal">0%</span></label>
     <label>JIT <input id="humanizeTime" type="range" min="0" max="30" value="0"> <span id="humanizeTimeVal">0ms</span></label>
     <label>VEL <input id="humanizeVel" type="range" min="0" max="100" value="0"> <span id="humanizeVelVal">0%</span></label>
     <button id="probModeBtn" class="prob">PROB</button>
     <input id="probSlider" type="range" min="0" max="100" value="100"> <span id="probSliderVal">100</span>
+    <button id="songBtn" class="song">SONG</button>
+    <input id="songLenInput" type="number" min="1" max="16" value="4" title="song length (entries)">
     <button id="recBtn" class="rec">REC</button>
     <button id="clearAutoBtn">CLR AUT</button>
     <span class="dim" id="autoCount">aut:0</span>
@@ -37,7 +46,7 @@
 <main id="grid"></main>
 
 <footer>
-  <span class="dim">click = on/off · PROBモードONでクリック→そのステップの発音確率を設定 · REC onのまま再生中に触ったツマミがオートメーション録音される</span>
+  <span class="dim">click = on/off · PROBモードONでクリック→発音確率設定 · SWINGは裏拍の遅延 · SONG行クリックで各エントリのパターン選択 · REC onのまま再生中に触ったツマミがオートメーション録音</span>
   <span class="dim midi" id="midiLabel">midi: ...</span>
 </footer>
 

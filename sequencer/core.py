@@ -3,6 +3,8 @@
 A thread ticks 16th notes, fires probability-gated notes (optionally random
 notes from a scale) over USB MIDI (mido / python-rtmidi), and replays a simple
 parameter-automation timeline recorded from the UI.
+
+v0.2: swing, multiple patterns, song mode.
 """
 import random
 import threading
@@ -15,6 +17,8 @@ from .scales import SCALES
 STEPS_PER_BAR = 16
 MAX_BARS = 32
 DEFAULT_BARS = 2
+NUM_PATTERNS = 4
+SONG_MAX = 16
 NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 
 
@@ -43,11 +47,30 @@ class Track:
                 self.steps[b][s] = [on, random.choice(probs) if on else 100]
 
 
+class Pattern:
+    """A pattern = 4 tracks of step data + its own bar length."""
+
+    def __init__(self, name="P"):
+        self.name = name
+        self.pattern_length = DEFAULT_BARS
+        self.tracks = [
+            Track("KICK", 0, 36, 120),
+            Track("SNARE", 1, 38, 110),
+            Track("HAT", 2, 42, 90),
+            Track("BASS", 3, 40, 105),
+        ]
+
+
 class Sequencer:
     def __init__(self, midi_port=None, virtual=True, bpm=120, bars=DEFAULT_BARS):
         self.bpm = bpm
-        self.pattern_length = bars
+        self.swing = 0.0                  # 0-100 %: delays offbeat 16ths
+        self.patterns = [Pattern(f"P{i + 1}") for i in range(NUM_PATTERNS)]
+        for p in self.patterns:
+            p.pattern_length = bars
+        self.current_pattern = 0
         self.edit_bar = 0
+
         self.playing = False
         self.current_bar = 0
         self.current_step = 0
@@ -60,12 +83,12 @@ class Sequencer:
         self._loop_start = 0.0
         self._note_offs = {}          # channel -> (note, release_time)
 
-        self.tracks = [
-            Track("KICK", 0, 36, 120),
-            Track("SNARE", 1, 38, 110),
-            Track("HAT", 2, 42, 90),
-            Track("BASS", 3, 40, 105),
-        ]
+        # song mode: ordered list of pattern indices, each plays its own length
+        self.song = [0] * SONG_MAX
+        self.song_len = 4
+        self.song_on = False
+        self._song_entry = 0
+
         self._seed_default_pattern()
 
         self._state_listeners = []
@@ -98,6 +121,15 @@ class Sequencer:
                 fn(self.current_bar, self.current_step)
             except Exception:
                 pass
+
+    # ------------------------------------------------------------------ access
+    @property
+    def tracks(self):
+        return self.patterns[self.current_pattern].tracks
+
+    @property
+    def pattern_length(self):
+        return self.patterns[self.current_pattern].pattern_length
 
     # -------------------------------------------------------------------- midi
     def _open_midi(self):
@@ -139,7 +171,16 @@ class Sequencer:
         return 60.0 / self.bpm / 4.0
 
     def _loop_duration(self):
+        if self.song_on and self.song_len > 0:
+            total_bars = sum(
+                self.patterns[self.song[i]].pattern_length for i in range(self.song_len)
+            )
+            return self._step_duration() * STEPS_PER_BAR * total_bars
         return self._step_duration() * STEPS_PER_BAR * self.pattern_length
+
+    @staticmethod
+    def _is_offbeat(n):
+        return n % 2 == 1
 
     def toggle_play(self):
         if self.playing:
@@ -151,6 +192,9 @@ class Sequencer:
         if self.playing:
             return
         self.playing = True
+        if self.song_on and self.song_len > 0:
+            self._song_entry = 0
+            self.current_pattern = self.song[0]
         self.current_bar = 0
         self.current_step = 0
         self._automation_idx = 0
@@ -168,15 +212,21 @@ class Sequencer:
 
     # -------------------------------------------------------------- tick loop
     def _tick_loop(self):
+        t0 = time.monotonic()
+        n = 0
+        step_dur = self._step_duration()
         while self.playing:
-            t0 = time.monotonic()
             self._play_step(self.current_bar, self.current_step)
-            self._advance()
             self._notify_step()
-            jitter = random.uniform(-self.humanize_time, self.humanize_time) / 1000.0
-            target = t0 + self._step_duration() + jitter
+            self._advance()
+            n += 1
+            ideal = t0 + n * step_dur
+            if self._is_offbeat(n):
+                ideal += (self.swing / 100.0) * step_dur
+            if self.humanize_time > 0:
+                ideal += random.uniform(-self.humanize_time, self.humanize_time) / 1000.0
             while self.playing:
-                rem = target - time.monotonic()
+                rem = ideal - time.monotonic()
                 if rem <= 0:
                     break
                 time.sleep(min(rem, 0.002))
@@ -185,7 +235,12 @@ class Sequencer:
         self.current_step += 1
         if self.current_step >= STEPS_PER_BAR:
             self.current_step = 0
-            self.current_bar = (self.current_bar + 1) % self.pattern_length
+            if self.song_on and self.song_len > 0:
+                self._song_entry = (self._song_entry + 1) % self.song_len
+                self.current_pattern = self.song[self._song_entry]
+                self.current_bar = 0
+            else:
+                self.current_bar = (self.current_bar + 1) % self.pattern_length
 
     def _play_step(self, bar, step):
         now = time.monotonic()
@@ -284,10 +339,24 @@ class Sequencer:
     def set_bpm(self, value):
         self.bpm = max(40, min(300, int(value)))
 
+    def set_swing(self, value):
+        self.swing = max(0, min(100, float(value)))
+
+    def set_pattern(self, index):
+        if 0 <= index < NUM_PATTERNS:
+            self.current_pattern = index
+            self.edit_bar = min(self.edit_bar, self.pattern_length - 1)
+            if not self.song_on:
+                self.current_bar = min(self.current_bar, self.pattern_length - 1)
+            self.notify_state()
+
     def set_pattern_length(self, value):
-        self.pattern_length = max(1, min(MAX_BARS, int(value)))
-        if self.edit_bar >= self.pattern_length:
-            self.edit_bar = self.pattern_length - 1
+        pat = self.patterns[self.current_pattern]
+        pat.pattern_length = max(1, min(MAX_BARS, int(value)))
+        if self.edit_bar >= pat.pattern_length:
+            self.edit_bar = pat.pattern_length - 1
+        if not self.song_on:
+            self.current_bar = min(self.current_bar, pat.pattern_length - 1)
 
     def set_edit_bar(self, value):
         self.edit_bar = max(0, min(self.pattern_length - 1, int(value)))
@@ -335,6 +404,22 @@ class Sequencer:
         if velocity is not None:
             self.humanize_velocity = max(0, min(100, int(velocity)))
 
+    # ------------------------------------------------------------------ song
+    def toggle_song(self):
+        self.song_on = not self.song_on
+        if self.song_on and self.song_len > 0:
+            self.current_pattern = self.song[0]
+        self.notify_state()
+
+    def set_song_entry(self, index, pattern):
+        if 0 <= index < SONG_MAX and 0 <= pattern < NUM_PATTERNS:
+            self.song[index] = pattern
+            self.notify_state()
+
+    def set_song_len(self, length):
+        self.song_len = max(1, min(SONG_MAX, int(length)))
+        self.notify_state()
+
     # ------------------------------------------------------------------ state
     def get_state(self):
         tracks = []
@@ -356,11 +441,17 @@ class Sequencer:
             })
         return {
             "bpm": self.bpm,
+            "swing": self.swing,
             "playing": self.playing,
             "current_bar": self.current_bar,
             "current_step": self.current_step,
             "edit_bar": self.edit_bar,
             "pattern_length": self.pattern_length,
+            "current_pattern": self.current_pattern,
+            "song": list(self.song),
+            "song_len": self.song_len,
+            "song_on": self.song_on,
+            "song_pos": self._song_entry,
             "recording": self.recording,
             "automation_count": len(self.automation),
             "humanize_time": self.humanize_time,
@@ -372,19 +463,17 @@ class Sequencer:
     # ------------------------------------------------------------------ seed
     def _seed_default_pattern(self):
         """A fun IDM-ish default so the first play sounds alive."""
-        kick = self.tracks[0]
+        pat = self.patterns[0]
+        kick = pat.tracks[0]
         for s in (0, 4, 8, 12):
             kick.steps[0][s] = [True, 100]
-
-        snare = self.tracks[1]
+        snare = pat.tracks[1]
         for s in (4, 12):
             snare.steps[0][s] = [True, 100]
-
-        hat = self.tracks[2]
+        hat = pat.tracks[2]
         for s in range(STEPS_PER_BAR):
             hat.steps[0][s] = [True, 40 if s % 4 == 0 else 100]
-
-        bass = self.tracks[3]
+        bass = pat.tracks[3]
         bass.mode = "scale"
         bass.steps[0][0] = [True, 100]
         bass.steps[0][10] = [True, 75]
