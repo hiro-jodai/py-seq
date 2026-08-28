@@ -1,0 +1,156 @@
+/* PI-SEQ browser UI — vanilla JS, no build step. */
+const $ = (id) => document.getElementById(id);
+
+const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+function noteName(n) { return NOTE_NAMES[n % 12] + (Math.floor(n / 12) - 1); }
+
+const SCALES = [
+  "chromatic", "minor_pentatonic", "major_pentatonic",
+  "natural_minor", "natural_major", "blues", "whole_tone", "dorian",
+];
+const TRACK_COLORS = ["#22d3ee", "#f472b6", "#fbbf24", "#a78bfa"];
+
+let state = null;
+let probMode = false;
+let live = { bar: 0, step: -1 };
+let ws = null;
+
+function connect() {
+  ws = new WebSocket(`ws://${location.host}/ws`);
+  ws.onmessage = (e) => {
+    let msg;
+    try { msg = JSON.parse(e.data); } catch { return; }
+    if (msg.type === "state") { state = msg; render(); }
+    else if (msg.type === "step") { live.bar = msg.bar; live.step = msg.step; renderLive(); }
+  };
+  ws.onclose = () => setTimeout(connect, 1000);
+}
+function send(obj) {
+  if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj));
+}
+
+/* ------------------------------------------------------------------ render */
+function render() {
+  if (!state) return;
+  $("playBtn").textContent = state.playing ? "■" : "▶";
+  $("bpmInput").value = state.bpm;
+  $("barLabel").textContent = `bar ${state.edit_bar + 1}/${state.pattern_length}`;
+  $("lenInput").value = state.pattern_length;
+  $("humanizeTime").value = state.humanize_time;
+  $("humanizeTimeVal").textContent = `${state.humanize_time}ms`;
+  $("humanizeVel").value = state.humanize_velocity;
+  $("humanizeVelVal").textContent = `${state.humanize_velocity}%`;
+  $("recBtn").classList.toggle("active", state.recording);
+  $("autoCount").textContent = `aut:${state.automation_count}`;
+  $("midiLabel").textContent = `midi: ${state.midi_port}`;
+  $("probModeBtn").classList.toggle("active", probMode);
+
+  const grid = $("grid");
+  grid.innerHTML = "";
+  state.tracks.forEach((tr, ti) => {
+    const row = document.createElement("div");
+    row.className = "track";
+
+    const left = document.createElement("div");
+    left.className = "track-ctl";
+    left.innerHTML = `
+      <span class="tname" style="color:${TRACK_COLORS[ti]}">${tr.name}</span>
+      <select class="tnote" title="note"></select>
+      <button class="tmode" title="fixed / scale-random">${tr.mode === "scale" ? "RND" : "FX"}</button>
+      <select class="tscale" title="scale"></select>
+      <input class="tvel" type="number" min="1" max="127" value="${tr.velocity}" title="velocity">
+      <button class="tdice" title="randomize pattern">🎲</button>
+    `;
+    const noteSel = left.querySelector(".tnote");
+    for (let n = 0; n <= 127; n++) {
+      const opt = document.createElement("option");
+      opt.value = n;
+      opt.textContent = noteName(n);
+      noteSel.appendChild(opt);
+    }
+    noteSel.value = tr.note;
+    const scaleSel = left.querySelector(".tscale");
+    SCALES.forEach((sc) => {
+      const opt = document.createElement("option");
+      opt.value = sc;
+      opt.textContent = sc;
+      scaleSel.appendChild(opt);
+    });
+    scaleSel.value = tr.scale;
+
+    noteSel.addEventListener("change", (e) => send({ type: "param", param: `note:${ti}`, value: parseInt(e.target.value) }));
+    left.querySelector(".tmode").addEventListener("click", () =>
+      send({ type: "set_track_mode", track: ti, mode: tr.mode === "scale" ? "fixed" : "scale" }));
+    scaleSel.addEventListener("change", (e) => send({ type: "set_track_scale", track: ti, scale: e.target.value }));
+    left.querySelector(".tvel").addEventListener("change", (e) =>
+      send({ type: "param", param: `vel:${ti}`, value: parseInt(e.target.value) }));
+    left.querySelector(".tdice").addEventListener("click", () => send({ type: "randomize_track", track: ti }));
+
+    const cells = document.createElement("div");
+    cells.className = "cells";
+    tr.steps.forEach((st, si) => {
+      const c = document.createElement("div");
+      c.className = "cell" + (st.on ? " on" : " off");
+      c.style.setProperty("--c", TRACK_COLORS[ti]);
+      c.style.opacity = st.on ? 0.45 + 0.55 * (st.prob / 100) : 1;
+      c.dataset.track = ti;
+      c.dataset.step = si;
+      c.innerHTML = `<span class="prob">${st.prob}%</span>`;
+      c.addEventListener("click", () => {
+        if (probMode) {
+          const p = parseInt($("probSlider").value);
+          send({ type: "param", param: `prob:${ti}:${state.edit_bar}:${si}`, value: p });
+        } else {
+          send({ type: "set_step", track: ti, step: si, on: !st.on });
+        }
+      });
+      cells.appendChild(c);
+    });
+
+    row.appendChild(left);
+    row.appendChild(cells);
+    grid.appendChild(row);
+  });
+  renderLive();
+}
+
+function renderLive() {
+  if (!state) return;
+  const rows = document.querySelectorAll(".track");
+  rows.forEach((rowEl) => {
+    rowEl.querySelectorAll(".cell").forEach((c) => {
+      const si = parseInt(c.dataset.step);
+      const playing = state.playing && live.bar === state.edit_bar && live.step === si;
+      c.classList.toggle("live", playing);
+    });
+  });
+  $("posLabel").textContent = state.playing ? `${live.bar + 1}:${live.step + 1}` : "--";
+}
+
+/* --------------------------------------------------------------- controls */
+$("playBtn").onclick = () => send({ type: "toggle_play" });
+$("bpmInput").onchange = (e) => send({ type: "param", param: "bpm", value: parseInt(e.target.value) });
+$("barPrev").onclick = () => send({ type: "set_edit_bar", value: state.edit_bar - 1 });
+$("barNext").onclick = () => send({ type: "set_edit_bar", value: state.edit_bar + 1 });
+$("lenInput").onchange = (e) => send({ type: "set_pattern_length", value: parseInt(e.target.value) });
+$("humanizeTime").oninput = (e) => {
+  $("humanizeTimeVal").textContent = `${e.target.value}ms`;
+  send({ type: "set_humanize", time_ms: parseInt(e.target.value) });
+};
+$("humanizeVel").oninput = (e) => {
+  $("humanizeVelVal").textContent = `${e.target.value}%`;
+  send({ type: "set_humanize", velocity: parseInt(e.target.value) });
+};
+$("recBtn").onclick = () => send({ type: state.recording ? "rec_off" : "rec_on" });
+$("clearAutoBtn").onclick = () => send({ type: "clear_automation" });
+$("probModeBtn").onclick = () => { probMode = !probMode; render(); };
+$("probSlider").oninput = (e) => { $("probSliderVal").textContent = e.target.value; };
+
+window.addEventListener("keydown", (e) => {
+  if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+  if (e.code === "Space") { e.preventDefault(); send({ type: "toggle_play" }); }
+  if (e.code === "ArrowLeft") send({ type: "set_edit_bar", value: state.edit_bar - 1 });
+  if (e.code === "ArrowRight") send({ type: "set_edit_bar", value: state.edit_bar + 1 });
+});
+
+connect();
