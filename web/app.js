@@ -168,6 +168,9 @@ function render() {
       <button class="tmode" title="fixed / scale-random">${tr.mode === "scale" ? "RND" : "FX"}</button>
       <button class="tdrum" title="drum map mode (Circuit Tracks pads 36-51)">DRUM</button>
       <select class="tpatch" title="drum patch / sample (sends CC to Circuit Tracks)"></select>
+      <select class="tpat" title="pattern lock (which pattern this track always plays)">
+        <option value="">FOLLOW</option><option value="0">P1</option><option value="1">P2</option><option value="2">P3</option><option value="3">P4</option>
+      </select>
       <select class="tscale" title="scale"></select>
       <input class="tvel" type="number" min="1" max="127" value="${tr.velocity}" title="velocity">
       <button class="tdice" title="randomize pattern">🎲</button>
@@ -221,6 +224,8 @@ function render() {
     }
     patchSel.value = tr.drum_patch == null ? 0 : tr.drum_patch;
     patchSel.style.display = tr.drum ? "" : "none";
+    const patSel = left.querySelector(".tpat");
+    patSel.value = tr.src_pattern == null ? "" : String(tr.src_pattern);
 
     noteSel.addEventListener("change", (e) => send({ type: "param", param: `note:${ti}`, value: parseInt(e.target.value) }));
     chanSel.addEventListener("change", (e) => send({ type: "set_track_channel", track: ti, channel: parseInt(e.target.value) }));
@@ -245,6 +250,8 @@ function render() {
       send({ type: "set_track_drum", track: ti, on: !tr.drum }));
     patchSel.addEventListener("change", (e) =>
       send({ type: "set_track_patch", track: ti, value: parseInt(e.target.value) }));
+    patSel.addEventListener("change", (e) =>
+      send({ type: "set_track_src_pattern", track: ti, value: e.target.value === "" ? null : parseInt(e.target.value) }));
     scaleSel.addEventListener("change", (e) => send({ type: "set_track_scale", track: ti, scale: e.target.value }));
     left.querySelector(".tvel").addEventListener("change", (e) =>
       send({ type: "param", param: `vel:${ti}`, value: parseInt(e.target.value) }));

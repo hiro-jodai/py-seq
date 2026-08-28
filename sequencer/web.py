@@ -165,6 +165,9 @@ def build_app(seq: Sequencer, web_dir, midi_in=None):
             seq.set_track_solo(msg.get("track", 0), msg.get("on", False))
         elif t == "set_track_patch":
             seq.set_track_patch(msg.get("track", 0), msg.get("value", 0))
+        elif t == "set_track_src_pattern":
+            v = msg.get("value")
+            seq.set_track_src_pattern(msg.get("track", 0), None if v is None else int(v))
         elif t == "set_track_scale":
             seq.set_track_scale(msg.get("track", 0), msg.get("scale", "minor_pentatonic"))
         elif t == "randomize_track":

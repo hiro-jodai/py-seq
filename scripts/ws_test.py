@@ -147,7 +147,16 @@ async def main():
         s = await recv_until(ws, lambda m: m["type"] == "state" and m["tracks"][0]["drum"] is False)
         print("drum map mode OK")
 
-        # mute / solo
+        # drum patch select
+        await ws.send(json.dumps({"type": "set_track_patch", "track": 0, "value": 5}))
+        s = await recv_until(ws, lambda m: m["type"] == "state" and m["tracks"][0]["drum_patch"] == 5)
+
+        # pattern lock
+        await ws.send(json.dumps({"type": "set_track_src_pattern", "track": 0, "value": 1}))
+        s = await recv_until(ws, lambda m: m["type"] == "state" and m["tracks"][0]["src_pattern"] == 1)
+        await ws.send(json.dumps({"type": "set_track_src_pattern", "track": 0, "value": None}))
+        s = await recv_until(ws, lambda m: m["type"] == "state" and m["tracks"][0]["src_pattern"] is None)
+        print("pattern lock OK")
         await ws.send(json.dumps({"type": "set_track_mute", "track": 0, "on": True}))
         s = await recv_until(ws, lambda m: m["type"] == "state" and m["tracks"][0]["mute"] is True)
         await ws.send(json.dumps({"type": "set_track_mute", "track": 0, "on": False}))

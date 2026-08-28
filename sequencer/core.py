@@ -58,6 +58,7 @@ class Track:
         self.drum_mode = False            # True: piano roll maps Circuit-style drum pads 36-51
         self.mute = False                 # muted: no notes fired
         self.solo = False                 # solo: only soloed tracks fire (if any solo is on)
+        self.src_pattern = None           # None=follow pattern switch, 0-3=always use that pattern's steps
         self.drum_slot = None             # 0-3: Circuit Tracks drum track this maps to
         self.drum_patch = None            # 0-63: drum patch/sample number (CC-sent)
         self.midi_out = None              # output port override (None = global)
@@ -429,9 +430,13 @@ class Sequencer:
             if not self._is_audible(ti):
                 self._cut_track(ti)   # stop anything still ringing on muted/soloed-out tracks
                 continue
-            cell = tr.steps[bar][step]
+            if tr.src_pattern is not None and 0 <= tr.src_pattern < len(self.patterns):
+                src_pat = self.patterns[tr.src_pattern]
+                cell = src_pat.tracks[ti].steps[bar][step] if ti < len(src_pat.tracks) else tr.steps[bar][step]
+            else:
+                cell = tr.steps[bar][step]
             on, prob = cell[0], cell[1]
-            notes = tr.notes_of(cell)
+            notes = Track.notes_of(cell)
             step_len = cell[3] if len(cell) > 3 else 1
             if not on:
                 continue
@@ -659,6 +664,12 @@ class Sequencer:
                     pass
         self.notify_state()
 
+    def set_track_src_pattern(self, track, index):
+        """Lock a track to a pattern (None=follow the pattern switch, 0-3=always use that one)."""
+        if 0 <= track < len(self.tracks):
+            self.tracks[track].src_pattern = None if index is None else max(0, min(3, int(index)))
+            self.notify_state()
+
     def set_track_scale(self, track, scale):
         if 0 <= track < len(self.tracks) and scale in SCALES:
             self.tracks[track].scale = scale
@@ -784,6 +795,7 @@ class Sequencer:
                 "scale": tr.scale,
                 "drum": tr.drum_mode,
                 "drum_patch": tr.drum_patch,
+                "src_pattern": tr.src_pattern,
                 "mute": tr.mute,
                 "solo": tr.solo,
                 "midi_out": tr.midi_out,

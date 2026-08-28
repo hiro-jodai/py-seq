@@ -356,4 +356,26 @@ cc = ccs[-1][1]
 assert cc.channel == 9 and cc.control == 8 and cc.value == 12, (cc.channel, cc.control, cc.value)
 assert seq17.get_state()["tracks"][4]["drum_patch"] == 12
 print("drum patch CC OK (CC8=12 on CH10)")
-print("ALL ENGINE v0.6.13 TESTS PASSED")
+
+# ------------------------------------------------------------- pattern lock
+seq18 = Sequencer(virtual=True, bpm=120, bars=1)
+for ti in range(4):
+    for b in range(len(seq18.tracks[ti].steps)):
+        for s in range(STEPS_PER_BAR):
+            seq18.tracks[ti].steps[b][s] = [False, 100, None, 1]
+seq18.set_step_note(0, 0, 0, 36, length=1)          # P1: KICK (track 0)
+seq18.set_pattern(1)
+seq18.set_step_note(1, 0, 0, 38, length=1)          # P2: SNARE (track 1)
+seq18.set_pattern(0)
+seq18.set_track_src_pattern(1, 1)                   # SNARE always plays P2's data
+seq18.out = TimedMockOut()
+m18 = seq18.out
+seq18.play()
+time.sleep(0.4)
+seq18.stop()
+ch0 = [x for x in m18.msgs if x[1].type == "note_on" and x[1].channel == 0]
+ch1 = [x for x in m18.msgs if x[1].type == "note_on" and x[1].channel == 1]
+assert ch0, "KICK should fire from P1"
+assert ch1, "SNARE should fire from locked P2 data while on P1"
+print("pattern lock OK (SNARE plays P2 while on P1)")
+print("ALL ENGINE v0.6.14 TESTS PASSED")
