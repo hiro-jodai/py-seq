@@ -41,6 +41,7 @@ class Track:
         self.velocity = velocity
         self.mode = "fixed"               # "fixed" | "scale"
         self.scale = "minor_pentatonic"
+        self.midi_out = None              # output port override (None = global)
         self.steps = [[[False, 100, None] for _ in range(STEPS_PER_BAR)] for _ in range(MAX_BARS)]
 
     def randomize(self, density=0.4):
@@ -85,7 +86,8 @@ class Sequencer:
         self.automation = []          # [(loop_time, param, value), ...]
         self._automation_idx = 0
         self._loop_start = 0.0
-        self._note_offs = {}          # channel -> (note, release_time)
+        self._note_offs = {}          # (track_idx, note) -> release_time
+        self._track_outputs = {}      # port name -> mido port (per-track devices)
 
         # song mode: ordered list of pattern indices, each plays its own length
         self.song = [0] * SONG_MAX
@@ -155,21 +157,45 @@ class Sequencer:
             self.out = None
             self.port_label = f"error: {e}"
 
-    def _send_note_on(self, channel, note, vel):
-        if self.out is None:
+    def _port_for(self, tr):
+        """Return the output port for a track (per-track override or global)."""
+        if tr.midi_out:
+            port = self._track_outputs.get(tr.midi_out)
+            if tr.midi_out not in self._track_outputs:
+                try:
+                    port = mido.open_output(tr.midi_out)
+                except Exception:
+                    port = None
+                self._track_outputs[tr.midi_out] = port
+            return port
+        return self.out
+
+    def _send_note_on(self, tr, note, vel):
+        port = self._port_for(tr)
+        if port is None:
             return
         try:
-            self.out.send(mido.Message("note_on", channel=channel, note=note, velocity=vel))
+            port.send(mido.Message("note_on", channel=tr.channel, note=note, velocity=vel))
         except Exception:
             pass
 
-    def _send_note_off(self, channel, note):
-        if self.out is None:
+    def _send_note_off(self, tr, note):
+        port = self._port_for(tr)
+        if port is None:
             return
         try:
-            self.out.send(mido.Message("note_off", channel=channel, note=note, velocity=0))
+            port.send(mido.Message("note_off", channel=tr.channel, note=note, velocity=0))
         except Exception:
             pass
+
+    def _all_ports(self):
+        ports = []
+        if self.out is not None:
+            ports.append(self.out)
+        for port in self._track_outputs.values():
+            if port is not None and port not in ports:
+                ports.append(port)
+        return ports
 
     def set_midi_out(self, name):
         """Re-open the MIDI output port at runtime (None closes it)."""
@@ -191,9 +217,18 @@ class Sequencer:
         self.notify_state()
 
     def _all_notes_off(self):
-        for ch, (note, _until) in self._note_offs.items():
-            self._send_note_off(ch, note)
+        for key, _until in list(self._note_offs.items()):
+            ti, note = key
+            if 0 <= ti < len(self.tracks):
+                self._send_note_off(self.tracks[ti], note)
         self._note_offs.clear()
+        # panic: CC123 (all notes off) on every channel of every open port
+        for port in self._all_ports():
+            for ch in range(16):
+                try:
+                    port.send(mido.Message("control_change", channel=ch, control=123, value=0))
+                except Exception:
+                    pass
 
     # --------------------------------------------------------------- transport
     def _step_duration(self):
@@ -275,11 +310,14 @@ class Sequencer:
         now = time.monotonic()
         step_dur = self._step_duration()
         # release notes whose duration has elapsed
-        for ch, (note, until) in list(self._note_offs.items()):
+        for key in list(self._note_offs):
+            until = self._note_offs[key]
             if now >= until:
-                self._send_note_off(ch, note)
-                del self._note_offs[ch]
-        for tr in self.tracks:
+                ti, note = key
+                if 0 <= ti < len(self.tracks):
+                    self._send_note_off(self.tracks[ti], note)
+                del self._note_offs[key]
+        for ti, tr in enumerate(self.tracks):
             on, prob, step_note = tr.steps[bar][step]
             if not on:
                 continue
@@ -287,8 +325,13 @@ class Sequencer:
                 continue
             note = step_note if step_note is not None else self._pick_note(tr)
             vel = self._pick_velocity(tr)
-            self._send_note_on(tr.channel, note, vel)
-            self._note_offs[tr.channel] = (note, now + step_dur * self.note_length)
+            # cut any still-sounding notes on this track so nothing gets stuck
+            for key in [k for k in self._note_offs if k[0] == ti]:
+                old_note = key[1]
+                self._send_note_off(tr, old_note)
+                del self._note_offs[key]
+            self._send_note_on(tr, note, vel)
+            self._note_offs[(ti, note)] = now + step_dur * self.note_length
         self._apply_automation(now)
 
     def _pick_note(self, tr):
@@ -426,6 +469,14 @@ class Sequencer:
         if 0 <= track < len(self.tracks):
             self.tracks[track].channel = max(0, min(15, int(channel) - 1))
 
+    def set_track_out(self, track, port_name):
+        """Route a track to its own MIDI output device (None = global)."""
+        if 0 <= track < len(self.tracks):
+            self.tracks[track].midi_out = port_name or None
+            if self.tracks[track].midi_out in self._track_outputs:
+                del self._track_outputs[self.tracks[track].midi_out]
+            self.notify_state()
+
     def set_track_vel(self, track, vel):
         if 0 <= track < len(self.tracks):
             self.tracks[track].velocity = max(1, min(127, int(vel)))
@@ -495,6 +546,7 @@ class Sequencer:
                 "velocity": tr.velocity,
                 "mode": tr.mode,
                 "scale": tr.scale,
+                "midi_out": tr.midi_out,
                 "steps": steps,
             })
         return {

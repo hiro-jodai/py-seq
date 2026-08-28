@@ -95,4 +95,42 @@ assert bass_notes == [48, 55], bass_notes
 assert seq4.tracks[3].steps[0][4] == [False, 100, None], "cleared note should be off"
 print("piano roll OK")
 
-print("ALL ENGINE v0.4 TESTS PASSED")
+# ---------------------------------------------------- stuck-note regression
+# swing 50 + notes on every step used to orphan note_offs (stuck notes)
+seq5 = Sequencer(virtual=True, bpm=120, bars=2)
+seq5.set_swing(50)
+for tr in seq5.tracks:
+    for b in range(len(tr.steps)):
+        for s in range(STEPS_PER_BAR):
+            tr.steps[b][s] = [True, 100, None]
+seq5.out = TimedMockOut()
+m5 = seq5.out
+seq5.play()
+time.sleep(1.6)   # ~13 steps through a swung bar
+seq5.stop()
+ons = [m for m in m5.msgs if m[1].type == "note_on"]
+offs = [m for m in m5.msgs if m[1].type == "note_off"]
+print("stuck-note check: note_on=%d note_off=%d" % (len(ons), len(offs)))
+assert len(offs) >= len(ons), "every note_on must get a note_off (no stuck notes)"
+# stop() should have swept everything: per-track on == off
+for ti in range(4):
+    n_on = sum(1 for m in ons if m[1].channel == seq5.tracks[ti].channel)
+    n_off = sum(1 for m in offs if m[1].channel == seq5.tracks[ti].channel)
+    assert n_off >= n_on, (ti, n_on, n_off)
+print("stuck-note regression OK (swing 50, dense pattern, stop sweeps clean)")
+
+# ------------------------------------------- per-track output routing (smoke)
+seq6 = Sequencer(virtual=True, bpm=120, bars=1)
+seq6.set_track_out(3, "NO-SUCH-PORT")   # bogus device: must not crash
+seq6.out = TimedMockOut()
+m6 = seq6.out
+seq6.play()
+time.sleep(0.4)
+seq6.stop()
+kick_ons = [m for m in m6.msgs if m[1].type == "note_on" and m[1].channel == 0]
+print("per-track out smoke: kick (global) notes =", len(kick_ons))
+assert len(kick_ons) > 0, "global port track should still play when another track has a bogus device"
+assert seq6.tracks[3].midi_out == "NO-SUCH-PORT"
+print("per-track output routing OK (bogus device skipped gracefully)")
+
+print("ALL ENGINE v0.4.1 TESTS PASSED")
