@@ -67,21 +67,25 @@ async def main():
 
         # piano roll note roundtrip
         await ws.send(json.dumps({"type": "set_step_note", "track": 3, "step": 5, "note": 55}))
-        s = await recv_until(ws, lambda m: m["type"] == "state" and m["tracks"][3]["steps"][5].get("note") == 55)
+        s = await recv_until(ws, lambda m: m["type"] == "state" and m["tracks"][3]["steps"][5].get("notes") == [55])
         assert s["tracks"][3]["steps"][5]["on"] is True
         print("set_step_note echo OK")
+        await ws.send(json.dumps({"type": "set_step_note", "track": 3, "step": 5, "note": 52}))
+        s = await recv_until(ws, lambda m: m["type"] == "state" and m["tracks"][3]["steps"][5].get("notes") == [52, 55])
+        print("chord add OK")
+        await ws.send(json.dumps({"type": "set_step_note", "track": 3, "step": 5, "note": 55}))
+        s = await recv_until(ws, lambda m: m["type"] == "state" and m["tracks"][3]["steps"][5].get("notes") == [52])
+        print("chord remove OK")
         await ws.send(json.dumps({"type": "set_step_note", "track": 3, "step": 5, "note": None}))
-        s = await recv_until(ws, lambda m: m["type"] == "state" and m["tracks"][3]["steps"][5].get("note") is None)
+        s = await recv_until(ws, lambda m: m["type"] == "state" and m["tracks"][3]["steps"][5].get("notes") is None)
         assert s["tracks"][3]["steps"][5]["on"] is False
         print("set_step_note clear OK")
 
         # note length roundtrip
         await ws.send(json.dumps({"type": "set_step_note", "track": 3, "step": 6, "note": 50, "length": 3}))
         s = await recv_until(ws, lambda m: m["type"] == "state" and m["tracks"][3]["steps"][6].get("length") == 3)
-        assert s["tracks"][3]["steps"][6]["note"] == 50
+        assert s["tracks"][3]["steps"][6]["notes"] == [50]
         print("set_step_length echo OK")
-        await ws.send(json.dumps({"type": "set_step_note", "track": 3, "step": 6, "note": None}))
-        await recv_until(ws, lambda m: m["type"] == "state" and m["tracks"][3]["steps"][6].get("note") is None)
 
         # midi learn plumbing
         await ws.send(json.dumps({"type": "midi_learn", "action": "swing"}))

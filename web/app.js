@@ -32,6 +32,7 @@ let state = null;
 let probMode = false;
 let pianoTrack = -1;   // track index showing the piano roll panel, -1 = off
 let pianoLen = 1;      // note length (in steps) used when placing piano-roll notes
+let drag = null;       // {track, step, len} while resizing a note's edge
 let live = { bar: 0, step: -1, pattern: 0, songPos: -1 };
 let ws = null;
 
@@ -213,8 +214,14 @@ function render() {
       c.style.opacity = st.on ? 0.45 + 0.55 * (st.prob / 100) : 1;
       c.dataset.track = ti;
       c.dataset.step = si;
-      c.innerHTML = st.note != null ? `<span class="prob">${noteName(st.note)}</span>` : `<span class="prob">${st.prob}%</span>`;
-      c.title = st.note != null ? `note ${noteName(st.note)} · len ${st.length || 1} · prob ${st.prob}%` : `prob ${st.prob}%`;
+      const ns = st.notes || [];
+      const label = ns.length === 0 ? `${st.prob}%`
+        : ns.length === 1 ? noteName(ns[0])
+        : `${noteName(ns[0])}+${ns.length - 1}`;
+      c.innerHTML = `<span class="prob">${label}</span>`;
+      c.title = ns.length
+        ? `notes ${ns.map(noteName).join(" ")} · len ${st.length || 1} · prob ${st.prob}%`
+        : `prob ${st.prob}%`;
       c.addEventListener("click", () => {
         if (probMode) {
           const p = parseInt($("probSlider").value);
@@ -233,7 +240,7 @@ function render() {
 
   // piano roll panel for the focused track
   if (pianoTrack >= 0 && pianoTrack < state.tracks.length) {
-    grid.appendChild(renderPiano(pianoTrack));
+    grid.appendChild(buildPianoPanel(pianoTrack));
   }
 
   // song row
@@ -290,17 +297,22 @@ function renderLive() {
 }
 
 /* --------------------------------------------------------------- piano roll */
-function renderPiano(track) {
+function buildPianoPanel(track) {
   const tr = state.tracks[track];
   const root = tr.note;
   const lo = root - 8, hi = root + 7;
+  const lenOf = (s) => (drag && drag.step === s ? drag.len : (tr.steps[s].length || 1));
+  const notesOf = (s) => (tr.steps[s].notes || []);
   // coverage[s] = pitches sounding at step s (start or tail)
   const coverage = Array.from({ length: 16 }, () => []);
+  // handleCells = set of "pitch:step" marking the right edge of each note
+  const handles = new Set();
   tr.steps.forEach((st, s) => {
-    if (st.note != null) {
-      const L = st.length || 1;
-      for (let x = 0; x < L && s + x < 16; x++) coverage[s + x].push(st.note);
-    }
+    const L = lenOf(s);
+    (st.notes || []).forEach((n) => {
+      for (let x = 0; x < L && s + x < 16; x++) coverage[s + x].push(n);
+      handles.add(`${n}:${Math.min(s + L - 1, 15)}`);
+    });
   });
   const panel = document.createElement("div");
   panel.className = "piano-panel";
@@ -310,7 +322,7 @@ function renderPiano(track) {
     <span class="piano-title" style="color:${tr.color}">🎹 PIANO — ${tr.name}</span>
     <span class="dim">root ${noteName(root)}</span>
     <label class="dim">LEN <input id="pianoLen" type="number" min="1" max="16" value="${pianoLen}"></label>
-    <span class="dim">click=set note / click again=clear / click tail=extend</span>`;
+    <span class="dim">click=add note / click note=remove / drag right edge=length</span>`;
   panel.appendChild(head);
   const grid = document.createElement("div");
   grid.className = "piano-grid";
@@ -323,22 +335,49 @@ function renderPiano(track) {
     row.appendChild(label);
     for (let s = 0; s < 16; s++) {
       const st = tr.steps[s];
-      const isStart = st.note === p;
+      const isStart = notesOf(s).includes(p);
       const isTail = !isStart && coverage[s].includes(p);
+      const isHandle = handles.has(`${p}:${s}`) && coverage[s].includes(p);
       const c = document.createElement("div");
       c.className = "piano-cell"
         + (isStart ? " on" : "")
         + (isTail ? " tail" : "")
+        + (isHandle ? " handle" : "")
         + (p === root ? " rootline" : "");
       c.style.setProperty("--c", tr.color);
       c.dataset.pitch = p;
       c.dataset.step = s;
       if (state.playing && live.bar === state.edit_bar && live.step === s) c.classList.add("live");
       c.addEventListener("click", () => {
-        if (isStart) send({ type: "set_step_note", track, step: s, note: null });
+        if (isStart) send({ type: "set_step_note", track, step: s, note: p });   // toggle off
         else if (isTail) send({ type: "set_step_length", track, step: s, length: (st.length || 1) + 1 });
         else send({ type: "set_step_note", track, step: s, note: p, length: pianoLen });
       });
+      if (isHandle) {
+        c.addEventListener("mousedown", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const cellW = (grid.querySelector(".piano-cell") || c).offsetWidth || 20;
+          const startX = e.clientX;
+          const startLen = st.length || 1;
+          drag = { track, step: s, len: startLen };
+          const onMove = (ev) => {
+            const delta = Math.round((ev.clientX - startX) / cellW);
+            drag.len = Math.max(1, Math.min(16 - s, startLen + delta));
+            refreshPiano();
+          };
+          const onUp = () => {
+            window.removeEventListener("mousemove", onMove);
+            window.removeEventListener("mouseup", onUp);
+            const finalLen = drag ? drag.len : startLen;
+            drag = null;
+            if (finalLen !== startLen) send({ type: "set_step_length", track, step: s, length: finalLen });
+            refreshPiano();
+          };
+          window.addEventListener("mousemove", onMove);
+          window.addEventListener("mouseup", onUp);
+        });
+      }
       row.appendChild(c);
     }
     grid.appendChild(row);
@@ -347,6 +386,13 @@ function renderPiano(track) {
   const lenInput = panel.querySelector("#pianoLen");
   lenInput.addEventListener("change", (e) => { pianoLen = Math.max(1, Math.min(16, parseInt(e.target.value) || 1)); });
   return panel;
+}
+
+function refreshPiano() {
+  if (pianoTrack < 0 || !state) return;
+  const old = document.querySelector(".piano-panel");
+  if (!old) return;
+  old.replaceWith(buildPianoPanel(pianoTrack));
 }
 
 /* --------------------------------------------------------------- controls */

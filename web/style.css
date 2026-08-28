@@ -226,6 +226,7 @@ input[type="number"] {
 }
 .piano-label.root { color: var(--accent); font-weight: 700; }
 .piano-cell {
+  position: relative;
   flex: 1;
   height: 20px;
   min-width: 0;
@@ -240,6 +241,17 @@ input[type="number"] {
 .piano-cell.on { background: color-mix(in srgb, var(--c) 55%, #12161f); border-color: var(--c); }
 .piano-cell.tail { background: color-mix(in srgb, var(--c) 25%, #12161f); border-color: color-mix(in srgb, var(--c) 50%, var(--border)); }
 .piano-cell.live { box-shadow: 0 0 0 1px #fff, 0 0 10px var(--c); }
+.piano-cell.handle { cursor: ew-resize; }
+.piano-cell.handle::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  right: 1px;
+  bottom: 3px;
+  width: 3px;
+  background: rgba(255, 255, 255, .4);
+  border-radius: 2px;
+}
 .piano-head input[type="number"] {
   background: var(--bg);
   color: var(--text);

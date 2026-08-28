@@ -36,11 +36,11 @@ def note_name(n):
 
 
 class Track:
-    """One sequencer lane: 32 bars x 16 steps, each step = [on, probability, note, length].
+    """One sequencer lane: 32 bars x 16 steps, each step = [on, probability, notes, length].
 
-    note is None -> use the track's fixed note / scale-random logic.
-    note is an int -> that exact pitch plays for this step (piano roll).
-    length is in step units (1 = one 16th note).
+    notes is None -> use the track's fixed note / scale-random logic.
+    notes is a list of ints -> a chord (one or more pitches) for this step.
+    length is in step units (1 = one 16th note), shared by all chord notes.
     """
 
     def __init__(self, name, channel, note, velocity=100):
@@ -59,6 +59,16 @@ class Track:
             for s in range(STEPS_PER_BAR):
                 on = random.random() < density
                 self.steps[b][s] = [on, random.choice(probs) if on else 100, None, 1]
+
+    @staticmethod
+    def notes_of(cell):
+        """Return the step's explicit note list, or None if it uses track logic."""
+        raw = cell[2] if len(cell) > 2 else None
+        if raw is None:
+            return None
+        if isinstance(raw, int):
+            return [raw]
+        return list(raw)
 
 
 class Pattern:
@@ -336,21 +346,22 @@ class Sequencer:
         for ti, tr in enumerate(self.tracks):
             cell = tr.steps[bar][step]
             on, prob = cell[0], cell[1]
-            step_note = cell[2] if len(cell) > 2 else None
+            notes = tr.notes_of(cell)
             step_len = cell[3] if len(cell) > 3 else 1
             if not on:
                 continue
             if random.random() * 100.0 >= prob:
                 continue
-            note = step_note if step_note is not None else self._pick_note(tr)
+            note_list = notes if notes is not None else [self._pick_note(tr)]
             vel = self._pick_velocity(tr)
             # cut any still-sounding notes on this track so nothing gets stuck
             for key in [k for k in self._note_offs if k[0] == ti]:
                 old_note = key[1]
                 self._send_note_off(tr, old_note)
                 del self._note_offs[key]
-            self._send_note_on(tr, note, vel)
-            self._note_offs[(ti, note)] = now + step_dur * self.note_length * step_len
+            for note in note_list:
+                self._send_note_on(tr, note, vel)
+                self._note_offs[(ti, note)] = now + step_dur * self.note_length * step_len
         self._apply_automation(now)
 
     def _pick_note(self, tr):
@@ -457,16 +468,32 @@ class Sequencer:
             self.tracks[track].steps[bar][step][0] = bool(on)
 
     def set_step_note(self, track, bar, step, note, length=None):
-        """Piano roll: set (or clear) an explicit pitch for one step."""
-        if 0 <= track < len(self.tracks) and 0 <= bar < MAX_BARS and 0 <= step < STEPS_PER_BAR:
-            if note is None:
-                self.tracks[track].steps[bar][step][0] = False
-                self.tracks[track].steps[bar][step][2] = None
-            else:
-                self.tracks[track].steps[bar][step][2] = max(0, min(127, int(note)))
-                self.tracks[track].steps[bar][step][0] = True
-                if length is not None:
-                    self.tracks[track].steps[bar][step][3] = max(1, min(16, int(length)))
+        """Piano roll: toggle a pitch in the step's chord.
+
+        note=None clears the whole step. Adding/removing a pitch toggles it.
+        """
+        if not (0 <= track < len(self.tracks) and 0 <= bar < MAX_BARS and 0 <= step < STEPS_PER_BAR):
+            return
+        cell = self.tracks[track].steps[bar][step]
+        if note is None:
+            cell[0] = False
+            cell[2] = None
+            return
+        pitch = max(0, min(127, int(note)))
+        notes = self.tracks[track].notes_of(cell) or []
+        if pitch in notes:
+            notes.remove(pitch)
+        else:
+            notes.append(pitch)
+            notes.sort()
+        if notes:
+            cell[0] = True
+            cell[2] = notes
+        else:
+            cell[0] = False
+            cell[2] = None
+        if length is not None:
+            cell[3] = max(1, min(16, int(length)))
 
     def set_step_length(self, track, bar, step, length):
         """Set how many steps a step's note sustains (1-16)."""
@@ -602,7 +629,7 @@ class Sequencer:
                 {
                     "on": tr.steps[self.edit_bar][s][0],
                     "prob": tr.steps[self.edit_bar][s][1],
-                    "note": tr.steps[self.edit_bar][s][2] if len(tr.steps[self.edit_bar][s]) > 2 else None,
+                    "notes": tr.notes_of(tr.steps[self.edit_bar][s]),
                     "length": tr.steps[self.edit_bar][s][3] if len(tr.steps[self.edit_bar][s]) > 3 else 1,
                 }
                 for s in range(STEPS_PER_BAR)

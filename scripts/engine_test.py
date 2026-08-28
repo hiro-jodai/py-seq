@@ -80,7 +80,7 @@ seq4 = Sequencer(virtual=True, bpm=120, bars=1)
 bass = seq4.tracks[3]
 for b in range(len(bass.steps)):
     for s in range(STEPS_PER_BAR):
-        bass.steps[b][s] = [False, 100, None]
+        bass.steps[b][s] = [False, 100, None, 1]
 seq4.set_step_note(3, 0, 0, 48)   # C3 explicit
 seq4.set_step_note(3, 0, 2, 55)   # G3 explicit
 seq4.set_step_note(3, 0, 4, None)  # clear (should turn off)
@@ -92,8 +92,33 @@ seq4.stop()
 bass_notes = sorted(set(m[1].note for m in m4.msgs if m[1].type == "note_on" and m[1].channel == 3))
 print("piano roll: bass notes played =", bass_notes)
 assert bass_notes == [48, 55], bass_notes
-assert seq4.tracks[3].steps[0][4] == [False, 100, None], "cleared note should be off"
+assert seq4.tracks[3].steps[0][4] == [False, 100, None, 1], "cleared note should be off"
 print("piano roll OK")
+
+# ------------------------------------------------------------- chords
+seq11 = Sequencer(virtual=True, bpm=120, bars=1)
+bass = seq11.tracks[3]
+for b in range(len(bass.steps)):
+    for s in range(STEPS_PER_BAR):
+        bass.steps[b][s] = [False, 100, None, 1]
+seq11.set_step_note(3, 0, 0, 48)   # C3
+seq11.set_step_note(3, 0, 0, 52)   # E3 -> chord
+seq11.set_step_note(3, 0, 0, 55)   # G3 -> C-E-G
+assert seq11.tracks[3].steps[0][0][2] == [48, 52, 55], seq11.tracks[3].steps[0][0][2]
+seq11.set_step_note(3, 0, 0, 52)   # toggle E off -> C-G
+assert seq11.tracks[3].steps[0][0][2] == [48, 55], seq11.tracks[3].steps[0][0][2]
+seq11.set_step_length(3, 0, 0, 2)
+seq11.out = TimedMockOut()
+m11 = seq11.out
+seq11.play()
+time.sleep(0.5)
+seq11.stop()
+chord_ons = sorted(set(m[1].note for m in m11.msgs if m[1].type == "note_on" and m[1].channel == 3))
+chord_offs = [m for m in m11.msgs if m[1].type == "note_off" and m[1].channel == 3]
+print("chord: notes =", chord_ons, "| offs =", len(chord_offs))
+assert chord_ons == [48, 55], chord_ons
+assert len(chord_offs) == 2, len(chord_offs)
+print("chord OK")
 
 # ---------------------------------------------------- stuck-note regression
 # swing 50 + notes on every step used to orphan note_offs (stuck notes)
