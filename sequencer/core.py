@@ -249,6 +249,27 @@ class Sequencer:
 
         threading.Thread(target=_off, daemon=True).start()
 
+    def drum_scan(self, track):
+        """Fire notes 36-51 in sequence on a track (find which pads respond)."""
+        if not (0 <= track < len(self.tracks)):
+            return
+        tr = self.tracks[track]
+        port = self._port_for(tr)
+        if port is None:
+            return
+
+        def _scan():
+            for n in range(36, 52):
+                try:
+                    port.send(mido.Message("note_on", channel=tr.channel, note=n, velocity=tr.velocity))
+                    time.sleep(0.15)
+                    port.send(mido.Message("note_off", channel=tr.channel, note=n, velocity=0))
+                    time.sleep(0.08)
+                except Exception:
+                    break
+
+        threading.Thread(target=_scan, daemon=True).start()
+
     def _all_ports(self):
         ports = []
         if self.out is not None:

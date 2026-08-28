@@ -318,4 +318,17 @@ offs = [x for x in m14.msgs if x[1].type == "note_off"]
 assert len(ons) == 1 and len(offs) == 1, (len(ons), len(offs))
 assert ons[0][1].channel == 9 and ons[0][1].note == 36, (ons[0][1].channel, ons[0][1].note)
 print("test note OK (CH10 note 36)")
-print("ALL ENGINE v0.6.8 TESTS PASSED")
+
+# ------------------------------------------------------------- drum scan
+seq15 = Sequencer(virtual=True, bpm=120, bars=1)
+seq15.set_track_channel(0, 10)
+seq15.out = TimedMockOut()
+m15 = seq15.out
+seq15.drum_scan(0)
+time.sleep(0.7)
+ons = [x for x in m15.msgs if x[1].type == "note_on"]
+assert len(ons) >= 3, len(ons)
+assert ons[0][1].channel == 9 and ons[0][1].note == 36, (ons[0][1].channel, ons[0][1].note)
+assert ons[1][1].note == 37 and ons[2][1].note == 38
+print("drum scan OK (36, 37, 38...)")
+print("ALL ENGINE v0.6.10 TESTS PASSED")

@@ -131,6 +131,11 @@ async def main():
         s = await recv_until(ws, lambda m: m["type"] == "state")
         print("test note OK")
 
+        # drum scan (36-51 sweep; expect a state echo, no crash)
+        await ws.send(json.dumps({"type": "drum_scan", "track": 0}))
+        s = await recv_until(ws, lambda m: m["type"] == "state")
+        print("drum scan OK")
+
         # drum map mode
         await ws.send(json.dumps({"type": "set_track_drum", "track": 0, "on": True}))
         s = await recv_until(ws, lambda m: m["type"] == "state" and m["tracks"][0]["drum"] is True)
