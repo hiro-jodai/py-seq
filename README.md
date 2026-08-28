@@ -54,6 +54,24 @@ MIDIポートを明示したい場合:
 .venv/bin/python scripts/midi_monitor.py
 ```
 
+## Windowsで動かす
+
+1. **Python 3.11+** をインストール（[python.org](https://www.python.org/downloads/) のインストーラで「Add to PATH」にチェック）
+2. リポジトリを取ってくる: `git clone https://github.com/hiro-jodai/py-seq.git && cd py-seq`
+3. **`setup.bat`** をダブルクリック（venv作成 + 依存インストール）
+4. **`run.bat --no-virtual`** で起動 → http://localhost:8000 をブラウザで開く
+
+### Windowsで音を出す
+
+- **すぐ試すだけなら**（ソフト音源・高レイテンシ）:
+  `run.bat --midi-port "Microsoft GS Wavetable Synth" --no-virtual`
+- **FL Studioに流す**: [loopMIDI](https://www.tobias-erichsen.de/software/loopmidi.html)（無料の仮想MIDIケーブル）をインストールしてポート作成 →
+  `run.bat --midi-port "loopMIDI Port" --no-virtual` →
+  FL Studioの **OPTIONS → MIDI settings** でloopMIDIをInputに追加 →
+  任意のチャンネルを選択するとノートが届く（MIDI入力は選択中チャンネルに入る）
+
+※ Windowsには仮想MIDIポートの仕組みがないので `--no-virtual` を使う（loopMIDIが仮想ポート役）。
+
 ## 使い方
 
 - **クリック** でステップ on/off
