@@ -301,6 +301,7 @@ assert len(seq13.tracks) == n0 + 1
 tr = seq13.tracks[-1]
 assert tr.channel == 9, tr.channel          # CH10 (0-based 9)
 assert tr.drum_mode is True
+assert tr.drum_slot == 0, tr.drum_slot      # Drum 1 -> CC 8 patch select
 assert tr.note == 60, tr.note               # Drum 1 trigger note (Programmer's Ref)
 st = seq13.get_state()["tracks"][-1]
 assert st["channel"] == 10 and st["drum"] is True and st["note"] == 60, st
@@ -342,4 +343,17 @@ seq15.drum_scan(0)
 time.sleep(1.0)
 assert 60 in seen and 62 in seen, seen
 print("drum scan OK (60, 62, 64, 65) + listener notifications")
-print("ALL ENGINE v0.6.12 TESTS PASSED")
+
+# ------------------------------------------------------------- drum patch CC
+seq17 = Sequencer(virtual=True, bpm=120, bars=1)
+seq17.add_drum_track()   # slot 0 -> patch select CC 8
+seq17.out = TimedMockOut()
+m17 = seq17.out
+seq17.set_track_patch(4, 12)
+ccs = [x for x in m17.msgs if x[1].type == "control_change"]
+assert ccs, "drum patch should send a CC"
+cc = ccs[-1][1]
+assert cc.channel == 9 and cc.control == 8 and cc.value == 12, (cc.channel, cc.control, cc.value)
+assert seq17.get_state()["tracks"][4]["drum_patch"] == 12
+print("drum patch CC OK (CC8=12 on CH10)")
+print("ALL ENGINE v0.6.13 TESTS PASSED")

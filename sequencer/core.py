@@ -24,6 +24,8 @@ MAX_TRACKS = 16
 # Circuit Tracks (Novation) drum trigger notes per the Programmer's Reference
 # Guide V3 "Drum Notes Table": each drum track fires on a single MIDI note.
 CT_DRUM_NOTES = [60, 62, 64, 65]
+# ...and its patch (sample) is selected via these CCs ("Drum Control" table).
+CT_DRUM_PATCH_CC = [8, 18, 44, 50]
 NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 PALETTE = [
     "#22d3ee", "#f472b6", "#fbbf24", "#a78bfa",
@@ -56,6 +58,8 @@ class Track:
         self.drum_mode = False            # True: piano roll maps Circuit-style drum pads 36-51
         self.mute = False                 # muted: no notes fired
         self.solo = False                 # solo: only soloed tracks fire (if any solo is on)
+        self.drum_slot = None             # 0-3: Circuit Tracks drum track this maps to
+        self.drum_patch = None            # 0-63: drum patch/sample number (CC-sent)
         self.midi_out = None              # output port override (None = global)
         self.steps = [[[False, 100, None, 1] for _ in range(STEPS_PER_BAR)] for _ in range(MAX_BARS)]
 
@@ -639,6 +643,22 @@ class Sequencer:
                         self._cut_track(ti)   # silence everything else immediately
             self.notify_state()
 
+    def set_track_patch(self, track, value):
+        """Set a Circuit Tracks drum patch (0-63) and send its CC (Ch10)."""
+        if not (0 <= track < len(self.tracks)):
+            return
+        tr = self.tracks[track]
+        tr.drum_patch = max(0, min(63, int(value)))
+        if tr.drum_slot is not None:
+            cc = CT_DRUM_PATCH_CC[tr.drum_slot % len(CT_DRUM_PATCH_CC)]
+            port = self._port_for(tr)
+            if port is not None:
+                try:
+                    port.send(mido.Message("control_change", channel=9, control=cc, value=tr.drum_patch))
+                except Exception:
+                    pass
+        self.notify_state()
+
     def set_track_scale(self, track, scale):
         if 0 <= track < len(self.tracks) and scale in SCALES:
             self.tracks[track].scale = scale
@@ -698,6 +718,7 @@ class Sequencer:
         for pat in self.patterns:
             t = Track(f"DRUM{(idx % 4) + 1}", 9, note, 100)   # CH10 (0-based 9)
             t.drum_mode = True
+            t.drum_slot = idx % 4
             pat.tracks.append(t)
         self.track_colors.append(PALETTE[len(self.track_colors) % len(PALETTE)])
         self.notify_state()
@@ -762,6 +783,7 @@ class Sequencer:
                 "mode": tr.mode,
                 "scale": tr.scale,
                 "drum": tr.drum_mode,
+                "drum_patch": tr.drum_patch,
                 "mute": tr.mute,
                 "solo": tr.solo,
                 "midi_out": tr.midi_out,

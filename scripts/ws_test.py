@@ -123,9 +123,11 @@ async def main():
         s = await recv_until(ws, lambda m: m["type"] == "state" and len(m["tracks"]) == 5
                              and m["tracks"][4]["drum"] is True and m["tracks"][4]["channel"] == 10
                              and m["tracks"][4]["note"] == 60)
+        await ws.send(json.dumps({"type": "set_track_patch", "track": 4, "value": 12}))
+        s = await recv_until(ws, lambda m: m["type"] == "state" and m["tracks"][4]["drum_patch"] == 12)
         await ws.send(json.dumps({"type": "track_remove", "index": 4}))
         s = await recv_until(ws, lambda m: m["type"] == "state" and len(m["tracks"]) == 4)
-        print("drum track preset OK")
+        print("drum track preset + patch OK")
 
         # test note (debug trigger; expect a state echo, no crash)
         await ws.send(json.dumps({"type": "test_note", "track": 0}))
