@@ -84,6 +84,25 @@ async def main():
         s = await recv_until(ws, lambda m: m["type"] == "state" and m.get("learn_mode") is False)
         print("midi learn cancel OK")
 
+        # track management + follow
+        await ws.send(json.dumps({"type": "track_add"}))
+        s = await recv_until(ws, lambda m: m["type"] == "state" and len(m["tracks"]) == 5)
+        print("track add OK")
+        await ws.send(json.dumps({"type": "set_track_name", "track": 4, "name": "FM1"}))
+        s = await recv_until(ws, lambda m: m["type"] == "state" and m["tracks"][4]["name"] == "FM1")
+        print("track rename OK")
+        await ws.send(json.dumps({"type": "set_track_color", "track": 4, "color": "#ff0000"}))
+        s = await recv_until(ws, lambda m: m["type"] == "state" and m["tracks"][4]["color"] == "#ff0000")
+        print("track color OK")
+        await ws.send(json.dumps({"type": "track_remove", "index": 4}))
+        s = await recv_until(ws, lambda m: m["type"] == "state" and len(m["tracks"]) == 4)
+        print("track remove OK")
+        await ws.send(json.dumps({"type": "toggle_follow"}))
+        s = await recv_until(ws, lambda m: m["type"] == "state" and m.get("follow") is False)
+        await ws.send(json.dumps({"type": "toggle_follow"}))
+        await recv_until(ws, lambda m: m["type"] == "state" and m.get("follow") is True)
+        print("follow toggle OK")
+
         # stop
         await ws.send(json.dumps({"type": "toggle_play"}))
         s = await recv_until(ws, lambda m: m["type"] == "state" and m["playing"] is False)

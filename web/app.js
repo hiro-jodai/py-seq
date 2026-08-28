@@ -59,6 +59,7 @@ function render() {
   $("bpmInput").value = state.bpm;
   $("barLabel").textContent = `bar ${state.edit_bar + 1}/${state.pattern_length}`;
   $("lenInput").value = state.pattern_length;
+  $("followBtn").classList.toggle("active", state.follow);
   $("swingRange").value = state.swing;
   $("swingVal").textContent = `${state.swing}%`;
   $("humanizeTime").value = state.humanize_time;
@@ -133,7 +134,8 @@ function render() {
     const left = document.createElement("div");
     left.className = "track-ctl";
     left.innerHTML = `
-      <span class="tname" style="color:${TRACK_COLORS[ti]}">${tr.name}</span>
+      <input class="tname" value="${tr.name}" maxlength="12" style="color:${tr.color}" title="track name">
+      <input type="color" class="tcolor" value="${tr.color}" title="track color">
       <select class="tchan" title="MIDI channel (1-16)"></select>
       <select class="tout" title="output device (GLOBAL = main MIDI OUT)"></select>
       <select class="tnote" title="note"></select>
@@ -142,6 +144,7 @@ function render() {
       <input class="tvel" type="number" min="1" max="127" value="${tr.velocity}" title="velocity">
       <button class="tdice" title="randomize pattern">🎲</button>
       <button class="tpiano" title="piano roll for this track">🎹</button>
+      <button class="tdel" title="remove track">🗑</button>
     `;
     const noteSel = left.querySelector(".tnote");
     for (let n = 0; n <= 127; n++) {
@@ -183,6 +186,11 @@ function render() {
     noteSel.addEventListener("change", (e) => send({ type: "param", param: `note:${ti}`, value: parseInt(e.target.value) }));
     chanSel.addEventListener("change", (e) => send({ type: "set_track_channel", track: ti, channel: parseInt(e.target.value) }));
     outSel.addEventListener("change", (e) => send({ type: "set_track_out", track: ti, port: e.target.value }));
+    left.querySelector(".tname").addEventListener("change", (e) => send({ type: "set_track_name", track: ti, name: e.target.value }));
+    left.querySelector(".tcolor").addEventListener("change", (e) => send({ type: "set_track_color", track: ti, color: e.target.value }));
+    const delBtn = left.querySelector(".tdel");
+    delBtn.style.display = state.tracks.length > 1 ? "" : "none";
+    delBtn.addEventListener("click", () => send({ type: "track_remove", index: ti }));
     left.querySelector(".tmode").addEventListener("click", () =>
       send({ type: "set_track_mode", track: ti, mode: tr.mode === "scale" ? "fixed" : "scale" }));
     scaleSel.addEventListener("change", (e) => send({ type: "set_track_scale", track: ti, scale: e.target.value }));
@@ -200,7 +208,7 @@ function render() {
     tr.steps.forEach((st, si) => {
       const c = document.createElement("div");
       c.className = "cell" + (st.on ? " on" : " off");
-      c.style.setProperty("--c", TRACK_COLORS[ti]);
+      c.style.setProperty("--c", tr.color);
       c.style.opacity = st.on ? 0.45 + 0.55 * (st.prob / 100) : 1;
       c.dataset.track = ti;
       c.dataset.step = si;
@@ -275,6 +283,9 @@ function renderLive() {
     });
   }
   $("posLabel").textContent = state.playing ? `${live.bar + 1}:${live.step + 1}` : "--";
+  if (state.playing && state.follow) {
+    $("barLabel").textContent = `▶ bar ${live.bar + 1}/${state.pattern_length}`;
+  }
 }
 
 /* --------------------------------------------------------------- piano roll */
@@ -287,7 +298,7 @@ function renderPiano(track) {
   const head = document.createElement("div");
   head.className = "piano-head";
   head.innerHTML = `
-    <span class="piano-title" style="color:${TRACK_COLORS[track]}">🎹 PIANO — ${tr.name}</span>
+    <span class="piano-title" style="color:${tr.color}">🎹 PIANO — ${tr.name}</span>
     <span class="dim">root ${noteName(root)} · click=set note / click again=clear · probはstepグリッドで調整</span>`;
   panel.appendChild(head);
   const grid = document.createElement("div");
@@ -303,7 +314,7 @@ function renderPiano(track) {
       const st = tr.steps[s];
       const c = document.createElement("div");
       c.className = "piano-cell" + (st.note === p ? " on" : "") + (p === root ? " rootline" : "");
-      c.style.setProperty("--c", TRACK_COLORS[track]);
+      c.style.setProperty("--c", tr.color);
       c.dataset.pitch = p;
       c.dataset.step = s;
       if (state.playing && live.bar === state.edit_bar && live.step === s) c.classList.add("live");
@@ -343,6 +354,8 @@ $("probModeBtn").onclick = () => { probMode = !probMode; render(); };
 $("probSlider").oninput = (e) => { $("probSliderVal").textContent = e.target.value; };
 $("songBtn").onclick = () => send({ type: "toggle_song" });
 $("songLenInput").onchange = (e) => send({ type: "set_song_len", value: parseInt(e.target.value) });
+$("followBtn").onclick = () => send({ type: "toggle_follow" });
+$("addTrackBtn").onclick = () => send({ type: "track_add" });
 $("midiOpenBtn").onclick = () => send({ type: "midi_set_port", port: $("midiPortSelect").value });
 $("midiOutOpenBtn").onclick = () => send({ type: "midi_set_out", port: $("midiOutSelect").value });
 $("midiLearnBtn").onclick = () => {

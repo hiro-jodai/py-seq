@@ -124,6 +124,18 @@ def build_app(seq: Sequencer, web_dir, midi_in=None):
             seq.set_track_channel(msg.get("track", 0), msg.get("channel", 1))
         elif t == "set_track_out":
             seq.set_track_out(msg.get("track", 0), msg.get("port") or None)
+        elif t == "track_add":
+            seq.add_track()
+        elif t == "track_remove":
+            seq.remove_track(msg.get("index", 0))
+        elif t == "set_track_name":
+            seq.set_track_name(msg.get("track", 0), msg.get("name", ""))
+        elif t == "set_track_color":
+            seq.set_track_color(msg.get("track", 0), msg.get("color", ""))
+        elif t == "set_follow":
+            seq.set_follow(msg.get("on", True))
+        elif t == "toggle_follow":
+            seq.toggle_follow()
         elif t == "set_track_vel":
             seq.set_track_vel(msg.get("track", 0), msg.get("velocity", 100))
         elif t == "set_track_mode":

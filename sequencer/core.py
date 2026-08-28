@@ -4,9 +4,10 @@ A thread ticks 16th notes, fires probability-gated notes (optionally random
 notes from a scale) over USB MIDI (mido / python-rtmidi), and replays a simple
 parameter-automation timeline recorded from the UI.
 
-v0.2: swing, multiple patterns, song mode.
+v0.5: dynamic tracks (add/remove/rename/recolor), follow mode.
 """
 import random
+import re
 import threading
 import time
 
@@ -19,7 +20,14 @@ MAX_BARS = 32
 DEFAULT_BARS = 2
 NUM_PATTERNS = 4
 SONG_MAX = 16
+MAX_TRACKS = 16
 NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+PALETTE = [
+    "#22d3ee", "#f472b6", "#fbbf24", "#a78bfa",
+    "#34d399", "#f87171", "#60a5fa", "#f97316",
+    "#2dd4bf", "#e879f9", "#a3e635", "#fb7185",
+    "#38bdf8", "#facc15", "#4ade80", "#c084fc",
+]
 
 
 def note_name(n):
@@ -75,6 +83,9 @@ class Sequencer:
             p.pattern_length = bars
         self.current_pattern = 0
         self.edit_bar = 0
+        self.follow = True            # auto-follow the playhead across bars
+
+        self.track_colors = list(PALETTE[:len(self.patterns[0].tracks)])
 
         self.playing = False
         self.current_bar = 0
@@ -300,11 +311,15 @@ class Sequencer:
         if self.current_step >= STEPS_PER_BAR:
             self.current_step = 0
             if self.song_on and self.song_len > 0:
-                self._song_entry = (self._song_entry + 1) % self.song_len
-                self.current_pattern = self.song[self._song_entry]
-                self.current_bar = 0
+                pat_len = self.patterns[self.current_pattern].pattern_length
+                self.current_bar = (self.current_bar + 1) % pat_len
+                if self.current_bar == 0:
+                    self._song_entry = (self._song_entry + 1) % self.song_len
+                    self.current_pattern = self.song[self._song_entry]
             else:
                 self.current_bar = (self.current_bar + 1) % self.pattern_length
+            if self.follow:
+                self.edit_bar = self.current_bar
 
     def _play_step(self, bar, step):
         now = time.monotonic()
@@ -521,6 +536,49 @@ class Sequencer:
         self.song_len = max(1, min(SONG_MAX, int(length)))
         self.notify_state()
 
+    # ------------------------------------------------------------- track mgmt
+    def add_track(self):
+        if len(self.tracks) >= MAX_TRACKS:
+            return
+        idx = len(self.tracks)
+        for pat in self.patterns:
+            pat.tracks.append(Track(f"TRK{idx + 1}", idx % 16, 48 + idx, 100))
+        self.track_colors.append(PALETTE[len(self.track_colors) % len(PALETTE)])
+        self.notify_state()
+
+    def remove_track(self, index):
+        if len(self.tracks) <= 1:
+            return
+        if 0 <= index < len(self.tracks):
+            for pat in self.patterns:
+                if index < len(pat.tracks):
+                    pat.tracks.pop(index)
+            if index < len(self.track_colors):
+                self.track_colors.pop(index)
+            self.notify_state()
+
+    def set_track_name(self, index, name):
+        if 0 <= index < len(self.tracks):
+            clean = (name or "").strip()[:16] or f"TRK{index + 1}"
+            for pat in self.patterns:
+                if index < len(pat.tracks):
+                    pat.tracks[index].name = clean
+            self.notify_state()
+
+    def set_track_color(self, index, color):
+        if 0 <= index < len(self.tracks) and re.match(r"^#[0-9a-fA-F]{6}$", color or ""):
+            self.track_colors[index] = color.lower()
+            self.notify_state()
+
+    def set_follow(self, on):
+        self.follow = bool(on)
+        if self.follow:
+            self.edit_bar = self.current_bar
+        self.notify_state()
+
+    def toggle_follow(self):
+        self.set_follow(not self.follow)
+
     # ------------------------------------------------------------------ state
     def get_state(self):
         try:
@@ -547,6 +605,7 @@ class Sequencer:
                 "mode": tr.mode,
                 "scale": tr.scale,
                 "midi_out": tr.midi_out,
+                "color": self.track_colors[i] if i < len(self.track_colors) else PALETTE[i % len(PALETTE)],
                 "steps": steps,
             })
         return {
@@ -558,6 +617,7 @@ class Sequencer:
             "edit_bar": self.edit_bar,
             "pattern_length": self.pattern_length,
             "current_pattern": self.current_pattern,
+            "follow": self.follow,
             "song": list(self.song),
             "song_len": self.song_len,
             "song_on": self.song_on,

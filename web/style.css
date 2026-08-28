@@ -108,7 +108,7 @@ input[type="number"] {
 #grid { min-width: 980px; }
 .track { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; }
 .track-ctl {
-  width: 250px;
+  width: 300px;
   flex-shrink: 0;
   display: flex;
   gap: 6px;
@@ -119,6 +119,27 @@ input[type="number"] {
   border-radius: 8px;
   padding: 6px 8px;
 }
+.track-ctl input[type="text"], .track-ctl .tname {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 3px 5px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  width: 76px;
+}
+.track-ctl input.tcolor {
+  width: 32px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg);
+  cursor: pointer;
+}
+.track-ctl .tdel { font-size: 11px; padding: 4px 5px; }
 .tname { font-weight: 700; font-size: 12px; letter-spacing: 1px; min-width: 44px; }
 .track-ctl select, .track-ctl input {
   background: var(--bg);

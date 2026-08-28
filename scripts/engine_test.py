@@ -133,4 +133,47 @@ assert len(kick_ons) > 0, "global port track should still play when another trac
 assert seq6.tracks[3].midi_out == "NO-SUCH-PORT"
 print("per-track output routing OK (bogus device skipped gracefully)")
 
-print("ALL ENGINE v0.4.1 TESTS PASSED")
+# --------------------------------------------------------- track management
+seq7 = Sequencer(virtual=True, bars=1)
+n0 = len(seq7.tracks)
+seq7.add_track()
+assert len(seq7.tracks) == n0 + 1
+for pat in seq7.patterns:
+    assert len(pat.tracks) == n0 + 1, "add must apply to all patterns"
+seq7.set_track_name(n0, "FM1")
+assert all(pat.tracks[n0].name == "FM1" for pat in seq7.patterns)
+seq7.set_track_color(n0, "#ff0000")
+assert seq7.track_colors[n0] == "#ff0000"
+seq7.remove_track(n0)
+assert len(seq7.tracks) == n0
+print("track mgmt OK")
+
+# ------------------------------------------------------------- follow mode
+seq8 = Sequencer(virtual=True, bpm=240, bars=2)   # 1 bar = 1s at 240bpm
+seq8.set_follow(True)
+seq8.play()
+time.sleep(1.3)   # should now be in bar 1
+assert seq8.current_bar == 1, seq8.current_bar
+assert seq8.edit_bar == 1, seq8.edit_bar
+seq8.stop()
+print("follow mode OK (edit_bar follows playhead)")
+
+# ------------------------------------------- song with multi-bar patterns
+seq9 = Sequencer(virtual=True, bpm=240, bars=1)
+seq9.patterns[0].pattern_length = 2
+seq9.patterns[1].pattern_length = 1
+seq9.song = [0, 1]
+seq9.song_len = 2
+seq9.song_on = True
+seq9.play()
+time.sleep(1.3)   # pattern 0 has 2 bars (2s): still inside it, bar 1
+p1, b1 = seq9.current_pattern, seq9.current_bar
+time.sleep(1.1)   # total 2.4s -> should have advanced to pattern 1
+p2 = seq9.current_pattern
+seq9.stop()
+print("song multi-bar: at 1.3s -> pat=%s bar=%s ; at 2.4s -> pat=%s" % (p1, b1, p2))
+assert p1 == 0 and b1 == 1, (p1, b1)
+assert p2 == 1, p2
+print("song multi-bar OK (pattern plays its full length before advancing)")
+
+print("ALL ENGINE v0.5 TESTS PASSED")
