@@ -58,6 +58,7 @@ function send(obj) {
 function render() {
   if (!state) return;
   $("playBtn").textContent = state.playing ? "■" : "▶";
+  $("playBtn").classList.toggle("playing", state.playing);
   $("bpmInput").value = state.bpm;
   $("barLabel").textContent = `bar ${state.edit_bar + 1}/${state.pattern_length}`;
   $("lenInput").value = state.pattern_length;

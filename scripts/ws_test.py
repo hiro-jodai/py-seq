@@ -123,6 +123,18 @@ async def main():
         await recv_until(ws, lambda m: m["type"] == "state" and m.get("follow") is True)
         print("follow toggle OK")
 
+        # follow pushes the followed bar while playing (UI grid must follow)
+        # ensure stopped first so no stale playing states confuse the sync check
+        if s.get("playing"):
+            await ws.send(json.dumps({"type": "toggle_play"}))
+            await recv_until(ws, lambda m: m["type"] == "state" and m["playing"] is False)
+        await ws.send(json.dumps({"type": "set_bpm", "value": 240}))
+        await ws.send(json.dumps({"type": "toggle_play"}))
+        s = await recv_until(ws, lambda m: m["type"] == "state" and m["playing"] is True)
+        e0 = s["edit_bar"]
+        s2 = await recv_until(ws, lambda m: m["type"] == "state" and m["playing"] is True and m["edit_bar"] != e0, n=40, timeout=4)
+        print("follow bar sync OK (edit_bar %s -> %s while playing)" % (e0, s2["edit_bar"]))
+
         # stop
         await ws.send(json.dumps({"type": "toggle_play"}))
         s = await recv_until(ws, lambda m: m["type"] == "state" and m["playing"] is False)

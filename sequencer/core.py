@@ -329,8 +329,9 @@ class Sequencer:
                     self.current_pattern = self.song[self._song_entry]
             else:
                 self.current_bar = (self.current_bar + 1) % self.pattern_length
-            if self.follow:
+            if self.follow and self.edit_bar != self.current_bar:
                 self.edit_bar = self.current_bar
+                self.notify_state()   # UI must re-render the followed bar
 
     def _play_step(self, bar, step):
         now = time.monotonic()
