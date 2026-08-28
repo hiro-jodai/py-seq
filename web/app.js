@@ -262,6 +262,20 @@ function render() {
     grid.appendChild(buildPianoPanel(pianoTrack));
   }
 
+  // add-track row: sits between the tracks and the SONG row
+  const addRow = document.createElement("div");
+  addRow.className = "track add-track-row";
+  addRow.title = "add a track";
+  const addCtl = document.createElement("div");
+  addCtl.className = "track-ctl";
+  addCtl.innerHTML = `<button class="tadd" title="add a track">＋</button><span class="dim">add track</span>`;
+  addRow.appendChild(addCtl);
+  const addCells = document.createElement("div");
+  addCells.className = "cells";
+  addRow.appendChild(addCells);
+  addRow.addEventListener("click", () => send({ type: "track_add" }));
+  grid.appendChild(addRow);
+
   // song row
   const songRow = document.createElement("div");
   songRow.className = "track song-row" + (state.song_on ? "" : " dim");

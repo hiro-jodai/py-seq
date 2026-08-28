@@ -127,6 +127,28 @@ input[type="number"] {
 
 #grid { min-width: 980px; }
 .track { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; }
+.add-track-row {
+  cursor: pointer;
+  opacity: .55;
+  border-top: 1px dashed var(--border);
+  padding-top: 10px;
+  transition: opacity .12s;
+}
+.add-track-row:hover { opacity: 1; background: rgba(255, 255, 255, .04); border-top-color: var(--accent); }
+.add-track-row .track-ctl { align-items: center; gap: 8px; }
+.tadd {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  font-size: 20px;
+  line-height: 1;
+  background: var(--bg2, #0e1b24);
+  color: var(--accent);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  padding: 0;
+}
+.tadd:hover { background: var(--accent); color: #06121a; }
 .track-ctl {
   width: 300px;
   flex-shrink: 0;
