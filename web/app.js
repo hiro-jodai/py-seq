@@ -33,6 +33,7 @@ let probMode = false;
 let pianoTrack = -1;   // track index showing the piano roll panel, -1 = off
 let pianoLen = 1;      // note length (in steps) used when placing piano-roll notes
 let drag = null;       // {track, step, len} while resizing a note's edge
+let suppressClick = false;  // true right after a real drag resize (swallow the click)
 let live = { bar: 0, step: -1, pattern: 0, songPos: -1 };
 let ws = null;
 
@@ -225,10 +226,14 @@ function render() {
       c.addEventListener("click", () => {
         if (probMode) {
           const p = parseInt($("probSlider").value);
-          send({ type: "param", param: `prob:${ti}:${state.edit_bar}:${si}`, value: p });
+          send({ type: "set_prob", track: ti, step: si, prob: p });
         } else {
           send({ type: "set_step", track: ti, step: si, on: !st.on });
         }
+      });
+      c.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+        send({ type: "set_step", track: ti, step: si, on: false });
       });
       cells.appendChild(c);
     });
@@ -305,12 +310,17 @@ function buildPianoPanel(track) {
   const notesOf = (s) => (tr.steps[s].notes || []);
   // coverage[s] = pitches sounding at step s (start or tail)
   const coverage = Array.from({ length: 16 }, () => []);
+  // sources["pitch:step"] = the start step of the note covering that cell
+  const sources = {};
   // handleCells = set of "pitch:step" marking the right edge of each note
   const handles = new Set();
   tr.steps.forEach((st, s) => {
     const L = lenOf(s);
     (st.notes || []).forEach((n) => {
-      for (let x = 0; x < L && s + x < 16; x++) coverage[s + x].push(n);
+      for (let x = 0; x < L && s + x < 16; x++) {
+        coverage[s + x].push(n);
+        sources[`${n}:${s + x}`] = s;
+      }
       handles.add(`${n}:${Math.min(s + L - 1, 15)}`);
     });
   });
@@ -322,7 +332,7 @@ function buildPianoPanel(track) {
     <span class="piano-title" style="color:${tr.color}">🎹 PIANO — ${tr.name}</span>
     <span class="dim">root ${noteName(root)}</span>
     <label class="dim">LEN <input id="pianoLen" type="number" min="1" max="16" value="${pianoLen}"></label>
-    <span class="dim">click=add note / click note=remove / drag right edge=length</span>`;
+    <span class="dim">click=add/remove note · right-click=delete · drag right edge=length</span>`;
   panel.appendChild(head);
   const grid = document.createElement("div");
   grid.className = "piano-grid";
@@ -349,9 +359,16 @@ function buildPianoPanel(track) {
       c.dataset.step = s;
       if (state.playing && live.bar === state.edit_bar && live.step === s) c.classList.add("live");
       c.addEventListener("click", () => {
+        if (suppressClick) { suppressClick = false; return; }
         if (isStart) send({ type: "set_step_note", track, step: s, note: p });   // toggle off
         else if (isTail) send({ type: "set_step_length", track, step: s, length: (st.length || 1) + 1 });
         else send({ type: "set_step_note", track, step: s, note: p, length: pianoLen });
+      });
+      c.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const src = sources[`${p}:${s}`];
+        if (src !== undefined) send({ type: "set_step_note", track, step: src, note: p });
       });
       if (isHandle) {
         c.addEventListener("mousedown", (e) => {
@@ -361,10 +378,16 @@ function buildPianoPanel(track) {
           const startX = e.clientX;
           const startLen = st.length || 1;
           drag = { track, step: s, len: startLen };
+          let lastLen = startLen;
           const onMove = (ev) => {
             const delta = Math.round((ev.clientX - startX) / cellW);
-            drag.len = Math.max(1, Math.min(16 - s, startLen + delta));
-            refreshPiano();
+            const nextLen = Math.max(1, Math.min(16 - s, startLen + delta));
+            if (nextLen !== lastLen) {
+              lastLen = nextLen;
+              drag.len = nextLen;
+              suppressClick = true;   // a real resize happened: swallow the click
+              refreshPiano();
+            }
           };
           const onUp = () => {
             window.removeEventListener("mousemove", onMove);
@@ -372,7 +395,6 @@ function buildPianoPanel(track) {
             const finalLen = drag ? drag.len : startLen;
             drag = null;
             if (finalLen !== startLen) send({ type: "set_step_length", track, step: s, length: finalLen });
-            refreshPiano();
           };
           window.addEventListener("mousemove", onMove);
           window.addEventListener("mouseup", onUp);
@@ -383,6 +405,7 @@ function buildPianoPanel(track) {
     grid.appendChild(row);
   }
   panel.appendChild(grid);
+  panel.addEventListener("contextmenu", (e) => e.preventDefault());   // disable browser menu inside the piano roll
   const lenInput = panel.querySelector("#pianoLen");
   lenInput.addEventListener("change", (e) => { pianoLen = Math.max(1, Math.min(16, parseInt(e.target.value) || 1)); });
   return panel;
