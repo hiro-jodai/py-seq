@@ -6,12 +6,17 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 
 from .core import MAX_BARS, STEPS_PER_BAR, Sequencer
+from .mapping import MidiMapper
 
 
-def build_app(seq: Sequencer, web_dir):
+def build_app(seq: Sequencer, web_dir, midi_in=None):
     app = FastAPI(title="PI-SEQ")
+    mapper = MidiMapper(seq, port_name=midi_in)
     clients = set()
     loop_ref = {"loop": None}
+
+    def state_msg():
+        return {"type": "state", **seq.get_state(), **mapper.get_state()}
 
     async def send_all(msg):
         data = json.dumps(msg, ensure_ascii=False)
@@ -27,7 +32,8 @@ def build_app(seq: Sequencer, web_dir):
             return
         asyncio.run_coroutine_threadsafe(send_all(msg), loop)
 
-    seq.set_state_listener(lambda: broadcast({"type": "state", **seq.get_state()}))
+    seq.set_state_listener(lambda: broadcast(state_msg()))
+    mapper.set_state_listener(lambda: broadcast(state_msg()))
     seq.set_step_listener(
         lambda bar, step: broadcast(
             {
@@ -63,6 +69,22 @@ def build_app(seq: Sequencer, web_dir):
         elif t == "set_song_on":
             if seq.song_on != bool(msg.get("on", True)):
                 seq.toggle_song()
+        elif t == "midi_set_port":
+            port = msg.get("port") or None
+            if port:
+                mapper.open_port(port)
+            else:
+                mapper.close_port()
+        elif t == "midi_learn":
+            mapper.set_learn(msg.get("action", "swing"))
+        elif t == "midi_learn_cancel":
+            mapper.set_learn(None)
+        elif t == "midi_map_rel":
+            mapper.set_mapping_rel(msg.get("index", 0), bool(msg.get("rel", True)))
+        elif t == "midi_map_remove":
+            mapper.remove_mapping(msg.get("index", 0))
+        elif t == "midi_map_clear":
+            mapper.clear_mappings()
         elif t == "set_pattern_length":
             seq.set_pattern_length(msg.get("value", 1))
         elif t == "set_edit_bar":
@@ -119,9 +141,7 @@ def build_app(seq: Sequencer, web_dir):
         clients.add(websocket)
         loop_ref["loop"] = asyncio.get_running_loop()
         try:
-            await websocket.send_text(
-                json.dumps({"type": "state", **seq.get_state()}, ensure_ascii=False)
-            )
+            await websocket.send_text(json.dumps(state_msg(), ensure_ascii=False))
             while True:
                 raw = await websocket.receive_text()
                 try:

@@ -404,6 +404,12 @@ class Sequencer:
         if velocity is not None:
             self.humanize_velocity = max(0, min(100, int(velocity)))
 
+    def set_humanize_time(self, value):
+        self.humanize_time = max(0, min(50, float(value)))
+
+    def set_humanize_velocity(self, value):
+        self.humanize_velocity = max(0, min(100, int(value)))
+
     # ------------------------------------------------------------------ song
     def toggle_song(self):
         self.song_on = not self.song_on

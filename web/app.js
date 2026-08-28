@@ -10,6 +10,24 @@ const SCALES = [
 ];
 const TRACK_COLORS = ["#22d3ee", "#f472b6", "#fbbf24", "#a78bfa"];
 
+const MIDI_ACTIONS = [
+  ["bpm", "BPM"], ["swing", "SWING"], ["humanize_time", "JIT TIME"], ["humanize_velocity", "VEL JIT"],
+  ["vel:0", "KICK VEL"], ["vel:1", "SNARE VEL"], ["vel:2", "HAT VEL"], ["vel:3", "BASS VEL"],
+  ["note:0", "KICK NOTE"], ["note:1", "SNARE NOTE"], ["note:2", "HAT NOTE"], ["note:3", "BASS NOTE"],
+  ["toggle_play", "PLAY/STOP"], ["pattern:0", "P1"], ["pattern:1", "P2"], ["pattern:2", "P3"], ["pattern:3", "P4"],
+  ["rec", "REC TOGGLE"], ["song_toggle", "SONG TOGGLE"], ["clear_auto", "CLR AUT"],
+  ["randomize:0", "KICK RND"], ["randomize:1", "SNARE RND"], ["randomize:2", "HAT RND"], ["randomize:3", "BASS RND"],
+];
+(function populateMidiActions() {
+  const sel = $("midiActionSelect");
+  MIDI_ACTIONS.forEach(([val, label]) => {
+    const opt = document.createElement("option");
+    opt.value = val;
+    opt.textContent = label;
+    sel.appendChild(opt);
+  });
+})();
+
 let state = null;
 let probMode = false;
 let live = { bar: 0, step: -1, pattern: 0, songPos: -1 };
@@ -54,6 +72,38 @@ function render() {
   $("songLenInput").value = state.song_len;
   ["p1", "p2", "p3", "p4"].forEach((id, i) => {
     $(id).classList.toggle("active", i === state.current_pattern);
+  });
+
+  // MIDI bar
+  const portSel = $("midiPortSelect");
+  const portOpts = portSel.options;
+  if (portOpts.length !== state.midi_ports.length ||
+      (state.midi_ports.length > 0 && portOpts[0] && portOpts[0].value !== state.midi_ports[0])) {
+    portSel.innerHTML = "";
+    state.midi_ports.forEach((p) => {
+      const opt = document.createElement("option");
+      opt.value = p;
+      opt.textContent = p;
+      portSel.appendChild(opt);
+    });
+  }
+  if (state.midi_in && state.midi_ports.includes(state.midi_in)) portSel.value = state.midi_in;
+  $("midiInLabel").textContent = state.midi_in || (state.midi_error ? `err: ${state.midi_error}` : "no port");
+  $("midiLearnBtn").classList.toggle("active", state.learn_mode);
+  $("midiLearnBtn").textContent = state.learn_mode ? "LEARN…" : "LEARN";
+  const mapList = $("midiMapList");
+  mapList.innerHTML = "";
+  state.mapping.forEach((m) => {
+    const chip = document.createElement("span");
+    chip.className = "map-chip";
+    chip.textContent = `${m.type === "cc" ? "CC" : "NOTE"} ${m.number} → ${m.action} [${m.rel ? "rel" : "abs"}]`;
+    chip.title = "click: toggle rel/abs · right-click: remove";
+    chip.addEventListener("click", () => send({ type: "midi_map_rel", index: m.index, rel: !m.rel }));
+    chip.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      send({ type: "midi_map_remove", index: m.index });
+    });
+    mapList.appendChild(chip);
   });
 
   const grid = $("grid");
@@ -197,6 +247,12 @@ $("probModeBtn").onclick = () => { probMode = !probMode; render(); };
 $("probSlider").oninput = (e) => { $("probSliderVal").textContent = e.target.value; };
 $("songBtn").onclick = () => send({ type: "toggle_song" });
 $("songLenInput").onchange = (e) => send({ type: "set_song_len", value: parseInt(e.target.value) });
+$("midiOpenBtn").onclick = () => send({ type: "midi_set_port", port: $("midiPortSelect").value });
+$("midiLearnBtn").onclick = () => {
+  if (state.learn_mode) send({ type: "midi_learn_cancel" });
+  else send({ type: "midi_learn", action: $("midiActionSelect").value });
+};
+$("midiMapClearBtn").onclick = () => send({ type: "midi_map_clear" });
 ["p1", "p2", "p3", "p4"].forEach((id, i) => {
   $(id).onclick = () => send({ type: "set_pattern", index: i });
 });

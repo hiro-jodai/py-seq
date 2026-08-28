@@ -43,6 +43,18 @@
   </div>
 </header>
 
+<div class="midi-bar">
+  <span class="dim">MIDI IN</span>
+  <select id="midiPortSelect"></select>
+  <button id="midiOpenBtn">OPEN</button>
+  <span class="dim" id="midiInLabel">—</span>
+  <span class="dim">→</span>
+  <select id="midiActionSelect" title="action to assign"></select>
+  <button id="midiLearnBtn" title="turn a knob / press a button on the controller">LEARN</button>
+  <button id="midiMapClearBtn" title="clear all mappings">CLR MAP</button>
+  <span id="midiMapList" class="midi-maps"></span>
+</div>
+
 <main id="grid"></main>
 
 <footer>

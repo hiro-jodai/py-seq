@@ -65,6 +65,15 @@ async def main():
         await recv_until(ws, lambda m: m["type"] == "state" and m["song_on"] is False)
         print("song off OK")
 
+        # midi learn plumbing
+        await ws.send(json.dumps({"type": "midi_learn", "action": "swing"}))
+        s = await recv_until(ws, lambda m: m["type"] == "state" and m.get("learn_mode") is True)
+        assert s.get("learn_action") == "swing" and "mapping" in s and "midi_ports" in s
+        print("midi learn on OK (ports:", len(s["midi_ports"]), ")")
+        await ws.send(json.dumps({"type": "midi_learn_cancel"}))
+        s = await recv_until(ws, lambda m: m["type"] == "state" and m.get("learn_mode") is False)
+        print("midi learn cancel OK")
+
         # stop
         await ws.send(json.dumps({"type": "toggle_play"}))
         s = await recv_until(ws, lambda m: m["type"] == "state" and m["playing"] is False)

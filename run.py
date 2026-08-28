@@ -23,6 +23,7 @@ def main():
     ap.add_argument("--host", default="0.0.0.0")
     ap.add_argument("--port", type=int, default=8000)
     ap.add_argument("--midi-port", default=None, help="explicit MIDI output port name")
+    ap.add_argument("--midi-in", default=None, help="MIDI input port name (controller)")
     ap.add_argument("--no-virtual", action="store_true", help="don't create a virtual MIDI port")
     ap.add_argument("--bpm", type=int, default=120)
     ap.add_argument("--bars", type=int, default=2)
@@ -35,7 +36,8 @@ def main():
         bars=args.bars,
     )
     print(f"[pi-seq] MIDI out: {seq.port_label}")
-    app = build_app(seq, ROOT / "web")
+    print(f"[pi-seq] MIDI in:  {args.midi_in or 'none (set in UI or --midi-in)'}")
+    app = build_app(seq, ROOT / "web", midi_in=args.midi_in)
     uvicorn.run(app, host=args.host, port=args.port, log_level="info")
 
 

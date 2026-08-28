@@ -69,6 +69,41 @@ input[type="number"] {
 .dim { color: var(--dim); font-size: 12px; }
 .midi { margin-left: auto; white-space: nowrap; }
 
+.midi-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  min-width: 980px;
+}
+.midi-bar select {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 4px 6px;
+  font-family: inherit;
+  font-size: 12px;
+  max-width: 220px;
+}
+.midi-maps { display: flex; gap: 4px; flex-wrap: wrap; }
+.map-chip {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 11px;
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.map-chip:hover { border-color: var(--accent); }
+
 #grid { min-width: 980px; }
 .track { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; }
 .track-ctl {
