@@ -292,4 +292,17 @@ assert not ch0 and ch1, ("solo: only ch1 should fire", len(ch0), len(ch1))
 seq12.set_track_solo(1, False)
 assert seq12.get_state()["tracks"][1]["solo"] is False
 print("mute / solo OK")
-print("ALL ENGINE v0.6.6 TESTS PASSED")
+
+# ------------------------------------------------------------- drum track preset
+seq13 = Sequencer(virtual=True, bpm=120, bars=1)
+n0 = len(seq13.tracks)
+seq13.add_drum_track()
+assert len(seq13.tracks) == n0 + 1
+tr = seq13.tracks[-1]
+assert tr.channel == 9, tr.channel          # CH10 (0-based 9)
+assert tr.drum_mode is True
+assert tr.note == 36                        # pad 36 = Kick
+st = seq13.get_state()["tracks"][-1]
+assert st["channel"] == 10 and st["drum"] is True and st["note"] == 36, st
+print("drum track preset OK")
+print("ALL ENGINE v0.6.7 TESTS PASSED")

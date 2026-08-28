@@ -278,12 +278,16 @@ function render() {
   addRow.title = "add a track";
   const addCtl = document.createElement("div");
   addCtl.className = "track-ctl";
-  addCtl.innerHTML = `<button class="tadd" title="add a track">＋</button><span class="dim">add track</span>`;
+  addCtl.innerHTML = `<button class="tadd" title="add a track">＋</button><span class="dim">add track</span><button class="tadd drum" title="add a Circuit Tracks drum track (CH10 + drum map)">＋ DRUM</button>`;
   addRow.appendChild(addCtl);
   const addCells = document.createElement("div");
   addCells.className = "cells";
   addRow.appendChild(addCells);
   addRow.addEventListener("click", () => send({ type: "track_add" }));
+  addCtl.querySelector(".tadd.drum").addEventListener("click", (e) => {
+    e.stopPropagation();
+    send({ type: "track_add_drum" });
+  });
   grid.appendChild(addRow);
 
   // song row

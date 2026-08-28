@@ -134,6 +134,8 @@ def build_app(seq: Sequencer, web_dir, midi_in=None):
             seq.set_track_out(msg.get("track", 0), msg.get("port") or None)
         elif t == "track_add":
             seq.add_track()
+        elif t == "track_add_drum":
+            seq.add_drum_track()
         elif t == "track_remove":
             seq.remove_track(msg.get("index", 0))
         elif t == "set_track_name":

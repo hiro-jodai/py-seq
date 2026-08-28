@@ -627,6 +627,18 @@ class Sequencer:
         self.track_colors.append(PALETTE[len(self.track_colors) % len(PALETTE)])
         self.notify_state()
 
+    def add_drum_track(self):
+        """Add a track preconfigured for Circuit Tracks drums: CH10 + drum map + pad 36."""
+        if len(self.tracks) >= MAX_TRACKS:
+            return
+        idx = len(self.tracks)
+        for pat in self.patterns:
+            t = Track(f"DRUM{idx + 1}", 9, 36, 100)   # CH10 (0-based 9), pad 36 = Kick
+            t.drum_mode = True
+            pat.tracks.append(t)
+        self.track_colors.append(PALETTE[len(self.track_colors) % len(PALETTE)])
+        self.notify_state()
+
     def remove_track(self, index):
         if len(self.tracks) <= 1:
             return

@@ -154,6 +154,8 @@ input[type="number"] {
   padding: 0;
 }
 .tadd:hover { background: var(--accent); color: #06121a; }
+.tadd.drum { width: auto; border-radius: 17px; padding: 0 12px; font-size: 13px; background: transparent; }
+.tadd.drum:hover { background: #fb923c; color: #1a0c02; border-color: #fb923c; }
 .track-ctl {
   width: 300px;
   flex-shrink: 0;

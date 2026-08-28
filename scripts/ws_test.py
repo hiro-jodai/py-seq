@@ -118,6 +118,14 @@ async def main():
         s = await recv_until(ws, lambda m: m["type"] == "state" and len(m["tracks"]) == 4)
         print("track remove OK")
 
+        # drum track preset (CH10 + drum map + pad 36)
+        await ws.send(json.dumps({"type": "track_add_drum"}))
+        s = await recv_until(ws, lambda m: m["type"] == "state" and len(m["tracks"]) == 5
+                             and m["tracks"][4]["drum"] is True and m["tracks"][4]["channel"] == 10)
+        await ws.send(json.dumps({"type": "track_remove", "index": 4}))
+        s = await recv_until(ws, lambda m: m["type"] == "state" and len(m["tracks"]) == 4)
+        print("drum track preset OK")
+
         # drum map mode
         await ws.send(json.dumps({"type": "set_track_drum", "track": 0, "on": True}))
         s = await recv_until(ws, lambda m: m["type"] == "state" and m["tracks"][0]["drum"] is True)
