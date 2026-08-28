@@ -176,4 +176,25 @@ assert p1 == 0 and b1 == 1, (p1, b1)
 assert p2 == 1, p2
 print("song multi-bar OK (pattern plays its full length before advancing)")
 
-print("ALL ENGINE v0.5 TESTS PASSED")
+# ------------------------------------------------------------- note lengths
+seq10 = Sequencer(virtual=True, bpm=120, bars=1)
+bass = seq10.tracks[3]
+for b in range(len(bass.steps)):
+    for s in range(STEPS_PER_BAR):
+        bass.steps[b][s] = [False, 100, None, 1]
+seq10.set_step_note(3, 0, 0, 48, length=4)
+assert seq10.tracks[3].steps[0][0][3] == 4
+seq10.out = TimedMockOut()
+m10 = seq10.out
+seq10.play()
+time.sleep(1.0)   # 8 steps
+seq10.stop()
+bass_ons = [x for x in m10.msgs if x[1].type == "note_on" and x[1].channel == 3]
+bass_offs = [x for x in m10.msgs if x[1].type == "note_off" and x[1].channel == 3]
+assert len(bass_ons) == 1 and len(bass_offs) == 1, (len(bass_ons), len(bass_offs))
+dur = bass_offs[0][0] - bass_ons[0][0]
+print("note length: duration = %.3fs (expect ~0.425s = 4 steps x 0.125 x 0.85)" % dur)
+assert 0.35 < dur < 0.55, dur
+print("note length OK")
+
+print("ALL ENGINE v0.5.1 TESTS PASSED")

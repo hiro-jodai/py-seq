@@ -104,6 +104,14 @@ def build_app(seq: Sequencer, web_dir, midi_in=None):
                 msg.get("bar", seq.edit_bar),
                 msg.get("step", 0),
                 msg.get("note"),
+                msg.get("length"),
+            )
+        elif t == "set_step_length":
+            seq.set_step_length(
+                msg.get("track", 0),
+                msg.get("bar", seq.edit_bar),
+                msg.get("step", 0),
+                msg.get("length", 1),
             )
         elif t == "set_prob":
             seq.set_prob(

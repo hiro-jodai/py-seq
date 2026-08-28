@@ -75,6 +75,14 @@ async def main():
         assert s["tracks"][3]["steps"][5]["on"] is False
         print("set_step_note clear OK")
 
+        # note length roundtrip
+        await ws.send(json.dumps({"type": "set_step_note", "track": 3, "step": 6, "note": 50, "length": 3}))
+        s = await recv_until(ws, lambda m: m["type"] == "state" and m["tracks"][3]["steps"][6].get("length") == 3)
+        assert s["tracks"][3]["steps"][6]["note"] == 50
+        print("set_step_length echo OK")
+        await ws.send(json.dumps({"type": "set_step_note", "track": 3, "step": 6, "note": None}))
+        await recv_until(ws, lambda m: m["type"] == "state" and m["tracks"][3]["steps"][6].get("note") is None)
+
         # midi learn plumbing
         await ws.send(json.dumps({"type": "midi_learn", "action": "swing"}))
         s = await recv_until(ws, lambda m: m["type"] == "state" and m.get("learn_mode") is True)

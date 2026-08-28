@@ -238,7 +238,18 @@ input[type="number"] {
 .piano-cell:hover { background: #1c2431; }
 .piano-cell.rootline { background: #10141c; }
 .piano-cell.on { background: color-mix(in srgb, var(--c) 55%, #12161f); border-color: var(--c); }
+.piano-cell.tail { background: color-mix(in srgb, var(--c) 25%, #12161f); border-color: color-mix(in srgb, var(--c) 50%, var(--border)); }
 .piano-cell.live { box-shadow: 0 0 0 1px #fff, 0 0 10px var(--c); }
+.piano-head input[type="number"] {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 2px 5px;
+  width: 52px;
+  font-family: inherit;
+  font-size: 12px;
+}
 
 footer {
   margin-top: 18px;

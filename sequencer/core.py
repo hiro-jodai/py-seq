@@ -36,10 +36,11 @@ def note_name(n):
 
 
 class Track:
-    """One sequencer lane: 32 bars x 16 steps, each step = [on, probability, note].
+    """One sequencer lane: 32 bars x 16 steps, each step = [on, probability, note, length].
 
     note is None -> use the track's fixed note / scale-random logic.
     note is an int -> that exact pitch plays for this step (piano roll).
+    length is in step units (1 = one 16th note).
     """
 
     def __init__(self, name, channel, note, velocity=100):
@@ -50,14 +51,14 @@ class Track:
         self.mode = "fixed"               # "fixed" | "scale"
         self.scale = "minor_pentatonic"
         self.midi_out = None              # output port override (None = global)
-        self.steps = [[[False, 100, None] for _ in range(STEPS_PER_BAR)] for _ in range(MAX_BARS)]
+        self.steps = [[[False, 100, None, 1] for _ in range(STEPS_PER_BAR)] for _ in range(MAX_BARS)]
 
     def randomize(self, density=0.4):
         probs = [100, 100, 100, 80, 60, 50]
         for b in range(MAX_BARS):
             for s in range(STEPS_PER_BAR):
                 on = random.random() < density
-                self.steps[b][s] = [on, random.choice(probs) if on else 100, None]
+                self.steps[b][s] = [on, random.choice(probs) if on else 100, None, 1]
 
 
 class Pattern:
@@ -333,7 +334,10 @@ class Sequencer:
                     self._send_note_off(self.tracks[ti], note)
                 del self._note_offs[key]
         for ti, tr in enumerate(self.tracks):
-            on, prob, step_note = tr.steps[bar][step]
+            cell = tr.steps[bar][step]
+            on, prob = cell[0], cell[1]
+            step_note = cell[2] if len(cell) > 2 else None
+            step_len = cell[3] if len(cell) > 3 else 1
             if not on:
                 continue
             if random.random() * 100.0 >= prob:
@@ -346,7 +350,7 @@ class Sequencer:
                 self._send_note_off(tr, old_note)
                 del self._note_offs[key]
             self._send_note_on(tr, note, vel)
-            self._note_offs[(ti, note)] = now + step_dur * self.note_length
+            self._note_offs[(ti, note)] = now + step_dur * self.note_length * step_len
         self._apply_automation(now)
 
     def _pick_note(self, tr):
@@ -452,7 +456,7 @@ class Sequencer:
         if 0 <= track < len(self.tracks) and 0 <= bar < MAX_BARS and 0 <= step < STEPS_PER_BAR:
             self.tracks[track].steps[bar][step][0] = bool(on)
 
-    def set_step_note(self, track, bar, step, note):
+    def set_step_note(self, track, bar, step, note, length=None):
         """Piano roll: set (or clear) an explicit pitch for one step."""
         if 0 <= track < len(self.tracks) and 0 <= bar < MAX_BARS and 0 <= step < STEPS_PER_BAR:
             if note is None:
@@ -461,6 +465,13 @@ class Sequencer:
             else:
                 self.tracks[track].steps[bar][step][2] = max(0, min(127, int(note)))
                 self.tracks[track].steps[bar][step][0] = True
+                if length is not None:
+                    self.tracks[track].steps[bar][step][3] = max(1, min(16, int(length)))
+
+    def set_step_length(self, track, bar, step, length):
+        """Set how many steps a step's note sustains (1-16)."""
+        if 0 <= track < len(self.tracks) and 0 <= bar < MAX_BARS and 0 <= step < STEPS_PER_BAR:
+            self.tracks[track].steps[bar][step][3] = max(1, min(16, int(length)))
 
     def set_prob(self, track, bar, step, prob):
         if 0 <= track < len(self.tracks) and 0 <= bar < MAX_BARS and 0 <= step < STEPS_PER_BAR:
@@ -591,7 +602,8 @@ class Sequencer:
                 {
                     "on": tr.steps[self.edit_bar][s][0],
                     "prob": tr.steps[self.edit_bar][s][1],
-                    "note": tr.steps[self.edit_bar][s][2],
+                    "note": tr.steps[self.edit_bar][s][2] if len(tr.steps[self.edit_bar][s]) > 2 else None,
+                    "length": tr.steps[self.edit_bar][s][3] if len(tr.steps[self.edit_bar][s]) > 3 else 1,
                 }
                 for s in range(STEPS_PER_BAR)
             ]
@@ -638,14 +650,14 @@ class Sequencer:
         pat = self.patterns[0]
         kick = pat.tracks[0]
         for s in (0, 4, 8, 12):
-            kick.steps[0][s] = [True, 100, None]
+            kick.steps[0][s] = [True, 100, None, 1]
         snare = pat.tracks[1]
         for s in (4, 12):
-            snare.steps[0][s] = [True, 100, None]
+            snare.steps[0][s] = [True, 100, None, 1]
         hat = pat.tracks[2]
         for s in range(STEPS_PER_BAR):
-            hat.steps[0][s] = [True, 40 if s % 4 == 0 else 100, None]
+            hat.steps[0][s] = [True, 40 if s % 4 == 0 else 100, None, 1]
         bass = pat.tracks[3]
         bass.mode = "scale"
-        bass.steps[0][0] = [True, 100, None]
-        bass.steps[0][10] = [True, 75, None]
+        bass.steps[0][0] = [True, 100, None, 1]
+        bass.steps[0][10] = [True, 75, None, 1]

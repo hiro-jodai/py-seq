@@ -31,6 +31,7 @@ const MIDI_ACTIONS = [
 let state = null;
 let probMode = false;
 let pianoTrack = -1;   // track index showing the piano roll panel, -1 = off
+let pianoLen = 1;      // note length (in steps) used when placing piano-roll notes
 let live = { bar: 0, step: -1, pattern: 0, songPos: -1 };
 let ws = null;
 
@@ -213,7 +214,7 @@ function render() {
       c.dataset.track = ti;
       c.dataset.step = si;
       c.innerHTML = st.note != null ? `<span class="prob">${noteName(st.note)}</span>` : `<span class="prob">${st.prob}%</span>`;
-      c.title = st.note != null ? `note ${noteName(st.note)} · prob ${st.prob}%` : `prob ${st.prob}%`;
+      c.title = st.note != null ? `note ${noteName(st.note)} · len ${st.length || 1} · prob ${st.prob}%` : `prob ${st.prob}%`;
       c.addEventListener("click", () => {
         if (probMode) {
           const p = parseInt($("probSlider").value);
@@ -293,13 +294,23 @@ function renderPiano(track) {
   const tr = state.tracks[track];
   const root = tr.note;
   const lo = root - 8, hi = root + 7;
+  // coverage[s] = pitches sounding at step s (start or tail)
+  const coverage = Array.from({ length: 16 }, () => []);
+  tr.steps.forEach((st, s) => {
+    if (st.note != null) {
+      const L = st.length || 1;
+      for (let x = 0; x < L && s + x < 16; x++) coverage[s + x].push(st.note);
+    }
+  });
   const panel = document.createElement("div");
   panel.className = "piano-panel";
   const head = document.createElement("div");
   head.className = "piano-head";
   head.innerHTML = `
     <span class="piano-title" style="color:${tr.color}">🎹 PIANO — ${tr.name}</span>
-    <span class="dim">root ${noteName(root)} · click=set note / click again=clear · probはstepグリッドで調整</span>`;
+    <span class="dim">root ${noteName(root)}</span>
+    <label class="dim">LEN <input id="pianoLen" type="number" min="1" max="16" value="${pianoLen}"></label>
+    <span class="dim">click=set note / click again=clear / click tail=extend</span>`;
   panel.appendChild(head);
   const grid = document.createElement("div");
   grid.className = "piano-grid";
@@ -312,21 +323,29 @@ function renderPiano(track) {
     row.appendChild(label);
     for (let s = 0; s < 16; s++) {
       const st = tr.steps[s];
+      const isStart = st.note === p;
+      const isTail = !isStart && coverage[s].includes(p);
       const c = document.createElement("div");
-      c.className = "piano-cell" + (st.note === p ? " on" : "") + (p === root ? " rootline" : "");
+      c.className = "piano-cell"
+        + (isStart ? " on" : "")
+        + (isTail ? " tail" : "")
+        + (p === root ? " rootline" : "");
       c.style.setProperty("--c", tr.color);
       c.dataset.pitch = p;
       c.dataset.step = s;
       if (state.playing && live.bar === state.edit_bar && live.step === s) c.classList.add("live");
       c.addEventListener("click", () => {
-        if (st.note === p) send({ type: "set_step_note", track, step: s, note: null });
-        else send({ type: "set_step_note", track, step: s, note: p });
+        if (isStart) send({ type: "set_step_note", track, step: s, note: null });
+        else if (isTail) send({ type: "set_step_length", track, step: s, length: (st.length || 1) + 1 });
+        else send({ type: "set_step_note", track, step: s, note: p, length: pianoLen });
       });
       row.appendChild(c);
     }
     grid.appendChild(row);
   }
   panel.appendChild(grid);
+  const lenInput = panel.querySelector("#pianoLen");
+  lenInput.addEventListener("change", (e) => { pianoLen = Math.max(1, Math.min(16, parseInt(e.target.value) || 1)); });
   return panel;
 }
 
