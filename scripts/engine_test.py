@@ -251,4 +251,45 @@ seq11.stop()
 kick_ons = [x for x in m11.msgs if x[1].type == "note_on" and x[1].channel == 0 and x[1].note == 36]
 assert kick_ons, "drum pad note 36 should fire on CH1"
 print("drum map toggle + pad note OK")
-print("ALL ENGINE v0.6.4 TESTS PASSED")
+
+# ------------------------------------------------------------- mute / solo
+seq12 = Sequencer(virtual=True, bpm=120, bars=1)
+for ti in range(4):
+    for b in range(len(seq12.tracks[ti].steps)):
+        for s in range(STEPS_PER_BAR):
+            seq12.tracks[ti].steps[b][s] = [False, 100, None, 1]
+seq12.set_step_note(0, 0, 0, 36, length=1)   # KICK  -> ch0
+seq12.set_step_note(1, 0, 0, 38, length=1)   # SNARE -> ch1
+seq12.out = TimedMockOut()
+m12 = seq12.out
+seq12.play()
+time.sleep(0.4)
+seq12.stop()
+ch0 = [x for x in m12.msgs if x[1].type == "note_on" and x[1].channel == 0]
+ch1 = [x for x in m12.msgs if x[1].type == "note_on" and x[1].channel == 1]
+assert ch0 and ch1, ("baseline: both tracks should fire", len(ch0), len(ch1))
+# mute track 0 -> only ch1 fires
+seq12.set_track_mute(0, True)
+assert seq12.get_state()["tracks"][0]["mute"] is True
+m12.msgs = []
+seq12.play()
+time.sleep(0.4)
+seq12.stop()
+ch0 = [x for x in m12.msgs if x[1].type == "note_on" and x[1].channel == 0]
+ch1 = [x for x in m12.msgs if x[1].type == "note_on" and x[1].channel == 1]
+assert not ch0 and ch1, ("mute: ch0 must be silent", len(ch0), len(ch1))
+# solo track 1 -> only ch1 fires (even though mute is off)
+seq12.set_track_mute(0, False)
+seq12.set_track_solo(1, True)
+assert seq12.get_state()["tracks"][1]["solo"] is True
+m12.msgs = []
+seq12.play()
+time.sleep(0.4)
+seq12.stop()
+ch0 = [x for x in m12.msgs if x[1].type == "note_on" and x[1].channel == 0]
+ch1 = [x for x in m12.msgs if x[1].type == "note_on" and x[1].channel == 1]
+assert not ch0 and ch1, ("solo: only ch1 should fire", len(ch0), len(ch1))
+seq12.set_track_solo(1, False)
+assert seq12.get_state()["tracks"][1]["solo"] is False
+print("mute / solo OK")
+print("ALL ENGINE v0.6.6 TESTS PASSED")

@@ -150,6 +150,10 @@ def build_app(seq: Sequencer, web_dir, midi_in=None):
             seq.set_track_mode(msg.get("track", 0), msg.get("mode", "fixed"))
         elif t == "set_track_drum":
             seq.set_track_drum(msg.get("track", 0), msg.get("on", False))
+        elif t == "set_track_mute":
+            seq.set_track_mute(msg.get("track", 0), msg.get("on", False))
+        elif t == "set_track_solo":
+            seq.set_track_solo(msg.get("track", 0), msg.get("on", False))
         elif t == "set_track_scale":
             seq.set_track_scale(msg.get("track", 0), msg.get("scale", "minor_pentatonic"))
         elif t == "randomize_track":

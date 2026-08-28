@@ -146,6 +146,8 @@ function render() {
     const left = document.createElement("div");
     left.className = "track-ctl";
     left.innerHTML = `
+      <button class="tmute" title="mute track">M</button>
+      <button class="tsolo" title="solo track">S</button>
       <input class="tname" value="${tr.name}" maxlength="12" style="color:${tr.color}" title="track name">
       <input type="color" class="tcolor" value="${tr.color}" title="track color">
       <select class="tchan" title="MIDI channel (1-16)"></select>
@@ -204,6 +206,14 @@ function render() {
     const delBtn = left.querySelector(".tdel");
     delBtn.style.display = state.tracks.length > 1 ? "" : "none";
     delBtn.addEventListener("click", () => send({ type: "track_remove", index: ti }));
+    const muteBtn = left.querySelector(".tmute");
+    muteBtn.classList.toggle("active", tr.mute);
+    muteBtn.addEventListener("click", () => send({ type: "set_track_mute", track: ti, on: !tr.mute }));
+    const soloBtn = left.querySelector(".tsolo");
+    soloBtn.classList.toggle("active", tr.solo);
+    soloBtn.addEventListener("click", () => send({ type: "set_track_solo", track: ti, on: !tr.solo }));
+    const anySolo = state.tracks.some(t => t.solo);
+    if (tr.mute || (anySolo && !tr.solo)) row.classList.add("muted");
     left.querySelector(".tmode").addEventListener("click", () =>
       send({ type: "set_track_mode", track: ti, mode: tr.mode === "scale" ? "fixed" : "scale" }));
     left.querySelector(".tdrum").classList.toggle("active", tr.drum);

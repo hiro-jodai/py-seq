@@ -51,6 +51,8 @@ class Track:
         self.mode = "fixed"               # "fixed" | "scale"
         self.scale = "minor_pentatonic"
         self.drum_mode = False            # True: piano roll maps Circuit-style drum pads 36-51
+        self.mute = False                 # muted: no notes fired
+        self.solo = False                 # solo: only soloed tracks fire (if any solo is on)
         self.midi_out = None              # output port override (None = global)
         self.steps = [[[False, 100, None, 1] for _ in range(STEPS_PER_BAR)] for _ in range(MAX_BARS)]
 
@@ -192,6 +194,22 @@ class Sequencer:
                 self._track_outputs[tr.midi_out] = port
             return port
         return self.out
+
+    def _is_audible(self, ti):
+        """A track fires unless it is muted, or another track is soloed and it isn't."""
+        tr = self.tracks[ti]
+        if tr.mute:
+            return False
+        if any(t.solo for t in self.tracks):
+            return tr.solo
+        return True
+
+    def _cut_track(self, ti):
+        """Send note-offs for every note still ringing on a track."""
+        for key in [k for k in self._note_offs if k[0] == ti]:
+            old_note = key[1]
+            self._send_note_off(self.tracks[ti], old_note)
+            del self._note_offs[key]
 
     def _send_note_on(self, tr, note, vel):
         port = self._port_for(tr)
@@ -346,6 +364,9 @@ class Sequencer:
                     self._send_note_off(self.tracks[ti], note)
                 del self._note_offs[key]
         for ti, tr in enumerate(self.tracks):
+            if not self._is_audible(ti):
+                self._cut_track(ti)   # stop anything still ringing on muted/soloed-out tracks
+                continue
             cell = tr.steps[bar][step]
             on, prob = cell[0], cell[1]
             notes = tr.notes_of(cell)
@@ -356,11 +377,7 @@ class Sequencer:
                 continue
             note_list = notes if notes is not None else [self._pick_note(tr)]
             vel = self._pick_velocity(tr)
-            # cut any still-sounding notes on this track so nothing gets stuck
-            for key in [k for k in self._note_offs if k[0] == ti]:
-                old_note = key[1]
-                self._send_note_off(tr, old_note)
-                del self._note_offs[key]
+            self._cut_track(ti)   # cut any still-sounding notes so nothing gets stuck
             for note in note_list:
                 self._send_note_on(tr, note, vel)
                 self._note_offs[(ti, note)] = now + step_dur * self.note_length * step_len
@@ -548,6 +565,22 @@ class Sequencer:
             self.tracks[track].drum_mode = bool(on)
             self.notify_state()
 
+    def set_track_mute(self, track, on):
+        if 0 <= track < len(self.tracks):
+            self.tracks[track].mute = bool(on)
+            if on:
+                self._cut_track(track)   # silence immediately
+            self.notify_state()
+
+    def set_track_solo(self, track, on):
+        if 0 <= track < len(self.tracks):
+            self.tracks[track].solo = bool(on)
+            if on:
+                for ti in range(len(self.tracks)):
+                    if ti != track:
+                        self._cut_track(ti)   # silence everything else immediately
+            self.notify_state()
+
     def set_track_scale(self, track, scale):
         if 0 <= track < len(self.tracks) and scale in SCALES:
             self.tracks[track].scale = scale
@@ -654,6 +687,8 @@ class Sequencer:
                 "mode": tr.mode,
                 "scale": tr.scale,
                 "drum": tr.drum_mode,
+                "mute": tr.mute,
+                "solo": tr.solo,
                 "midi_out": tr.midi_out,
                 "color": self.track_colors[i] if i < len(self.track_colors) else PALETTE[i % len(PALETTE)],
                 "steps": steps,

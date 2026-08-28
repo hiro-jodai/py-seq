@@ -127,6 +127,11 @@ input[type="number"] {
 
 #grid { min-width: 980px; }
 .track { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; }
+.track.muted .cells { opacity: .35; }
+.track.muted .track-ctl { opacity: .55; }
+.tmute, .tsolo { min-width: 26px; padding: 3px 5px; font-weight: 700; }
+.tmute.active { background: var(--red); color: #fff; border-color: var(--red); }
+.tsolo.active { background: #fbbf24; color: #1a1204; border-color: #fbbf24; }
 .add-track-row {
   cursor: pointer;
   opacity: .55;

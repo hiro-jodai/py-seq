@@ -124,6 +124,17 @@ async def main():
         await ws.send(json.dumps({"type": "set_track_drum", "track": 0, "on": False}))
         s = await recv_until(ws, lambda m: m["type"] == "state" and m["tracks"][0]["drum"] is False)
         print("drum map mode OK")
+
+        # mute / solo
+        await ws.send(json.dumps({"type": "set_track_mute", "track": 0, "on": True}))
+        s = await recv_until(ws, lambda m: m["type"] == "state" and m["tracks"][0]["mute"] is True)
+        await ws.send(json.dumps({"type": "set_track_mute", "track": 0, "on": False}))
+        s = await recv_until(ws, lambda m: m["type"] == "state" and m["tracks"][0]["mute"] is False)
+        await ws.send(json.dumps({"type": "set_track_solo", "track": 1, "on": True}))
+        s = await recv_until(ws, lambda m: m["type"] == "state" and m["tracks"][1]["solo"] is True)
+        await ws.send(json.dumps({"type": "set_track_solo", "track": 1, "on": False}))
+        s = await recv_until(ws, lambda m: m["type"] == "state" and m["tracks"][1]["solo"] is False)
+        print("mute / solo OK")
         await ws.send(json.dumps({"type": "toggle_follow"}))
         s = await recv_until(ws, lambda m: m["type"] == "state" and m.get("follow") is False)
         await ws.send(json.dumps({"type": "toggle_follow"}))
