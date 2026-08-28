@@ -50,6 +50,7 @@ class Track:
         self.velocity = velocity
         self.mode = "fixed"               # "fixed" | "scale"
         self.scale = "minor_pentatonic"
+        self.drum_mode = False            # True: piano roll maps Circuit-style drum pads 36-51
         self.midi_out = None              # output port override (None = global)
         self.steps = [[[False, 100, None, 1] for _ in range(STEPS_PER_BAR)] for _ in range(MAX_BARS)]
 
@@ -541,6 +542,12 @@ class Sequencer:
         if 0 <= track < len(self.tracks) and mode in ("fixed", "scale"):
             self.tracks[track].mode = mode
 
+    def set_track_drum(self, track, on):
+        """Drum map mode: piano roll snaps to Circuit Tracks drum pads 36-51."""
+        if 0 <= track < len(self.tracks):
+            self.tracks[track].drum_mode = bool(on)
+            self.notify_state()
+
     def set_track_scale(self, track, scale):
         if 0 <= track < len(self.tracks) and scale in SCALES:
             self.tracks[track].scale = scale
@@ -646,6 +653,7 @@ class Sequencer:
                 "velocity": tr.velocity,
                 "mode": tr.mode,
                 "scale": tr.scale,
+                "drum": tr.drum_mode,
                 "midi_out": tr.midi_out,
                 "color": self.track_colors[i] if i < len(self.track_colors) else PALETTE[i % len(PALETTE)],
                 "steps": steps,

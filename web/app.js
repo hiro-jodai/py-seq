@@ -4,6 +4,15 @@ const $ = (id) => document.getElementById(id);
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 function noteName(n) { return NOTE_NAMES[n % 12] + (Math.floor(n / 12) - 1); }
 
+// Circuit Tracks drum pads are notes 36-51 (C1..Db2). Friendly names for the
+// default factory drum rack; unnamed pads fall back to note names.
+const DRUM_NAMES = {
+  36: "Kick", 37: "Kick2", 38: "Snare", 39: "Snare2", 40: "Clap",
+  41: "Rim", 42: "CH", 43: "Perc", 44: "PedalH", 45: "Perc2",
+  46: "OH", 47: "Perc3", 48: "Tom", 49: "Crash", 50: "Tom2", 51: "Ride",
+};
+function padName(n) { return DRUM_NAMES[n] || noteName(n); }
+
 const SCALES = [
   "chromatic", "minor_pentatonic", "major_pentatonic",
   "natural_minor", "natural_major", "blues", "whole_tone", "dorian",
@@ -143,6 +152,7 @@ function render() {
       <select class="tout" title="output device (GLOBAL = main MIDI OUT)"></select>
       <select class="tnote" title="note"></select>
       <button class="tmode" title="fixed / scale-random">${tr.mode === "scale" ? "RND" : "FX"}</button>
+      <button class="tdrum" title="drum map mode (Circuit Tracks pads 36-51)">DRUM</button>
       <select class="tscale" title="scale"></select>
       <input class="tvel" type="number" min="1" max="127" value="${tr.velocity}" title="velocity">
       <button class="tdice" title="randomize pattern">🎲</button>
@@ -196,6 +206,9 @@ function render() {
     delBtn.addEventListener("click", () => send({ type: "track_remove", index: ti }));
     left.querySelector(".tmode").addEventListener("click", () =>
       send({ type: "set_track_mode", track: ti, mode: tr.mode === "scale" ? "fixed" : "scale" }));
+    left.querySelector(".tdrum").classList.toggle("active", tr.drum);
+    left.querySelector(".tdrum").addEventListener("click", () =>
+      send({ type: "set_track_drum", track: ti, on: !tr.drum }));
     scaleSel.addEventListener("change", (e) => send({ type: "set_track_scale", track: ti, scale: e.target.value }));
     left.querySelector(".tvel").addEventListener("change", (e) =>
       send({ type: "param", param: `vel:${ti}`, value: parseInt(e.target.value) }));
@@ -216,12 +229,13 @@ function render() {
       c.dataset.track = ti;
       c.dataset.step = si;
       const ns = st.notes || [];
+      const nm = (n) => (tr.drum ? padName(n) : noteName(n));
       const label = ns.length === 0 ? `${st.prob}%`
-        : ns.length === 1 ? noteName(ns[0])
-        : `${noteName(ns[0])}+${ns.length - 1}`;
+        : ns.length === 1 ? nm(ns[0])
+        : `${nm(ns[0])}+${ns.length - 1}`;
       c.innerHTML = `<span class="prob">${label}</span>`;
       c.title = ns.length
-        ? `notes ${ns.map(noteName).join(" ")} · len ${st.length || 1} · prob ${st.prob}%`
+        ? `notes ${ns.map(nm).join(" ")} · len ${st.length || 1} · prob ${st.prob}%`
         : `prob ${st.prob}%`;
       c.addEventListener("click", () => {
         if (probMode) {
@@ -304,8 +318,10 @@ function renderLive() {
 /* --------------------------------------------------------------- piano roll */
 function buildPianoPanel(track) {
   const tr = state.tracks[track];
+  const drum = !!tr.drum;
   const root = tr.note;
-  const lo = root - 8, hi = root + 7;
+  const lo = drum ? 36 : root - 8;
+  const hi = drum ? 51 : root + 7;
   const lenOf = (s) => (drag && drag.step === s ? drag.len : (tr.steps[s].length || 1));
   const notesOf = (s) => (tr.steps[s].notes || []);
   // coverage[s] = pitches sounding at step s (start or tail)
@@ -330,7 +346,7 @@ function buildPianoPanel(track) {
   head.className = "piano-head";
   head.innerHTML = `
     <span class="piano-title" style="color:${tr.color}">🎹 PIANO — ${tr.name}</span>
-    <span class="dim">root ${noteName(root)}</span>
+    <span class="dim">${drum ? "drum map 36-51 (Circuit Tracks pads)" : `root ${noteName(root)}`}</span>
     <label class="dim">LEN <input id="pianoLen" type="number" min="1" max="16" value="${pianoLen}"></label>
     <span class="dim">click=add/remove note · right-click=delete · drag right edge=length</span>`;
   panel.appendChild(head);
@@ -340,8 +356,8 @@ function buildPianoPanel(track) {
     const row = document.createElement("div");
     row.className = "piano-row";
     const label = document.createElement("span");
-    label.className = "piano-label" + (p === root ? " root" : "");
-    label.textContent = noteName(p);
+    label.className = "piano-label" + ((p === root && !drum) ? " root" : "");
+    label.textContent = drum ? `${p} ${padName(p)}` : noteName(p);
     row.appendChild(label);
     for (let s = 0; s < 16; s++) {
       const st = tr.steps[s];
@@ -353,7 +369,7 @@ function buildPianoPanel(track) {
         + (isStart ? " on" : "")
         + (isTail ? " tail" : "")
         + (isHandle ? " handle" : "")
-        + (p === root ? " rootline" : "");
+        + ((p === root && !drum) ? " rootline" : "");
       c.style.setProperty("--c", tr.color);
       c.dataset.pitch = p;
       c.dataset.step = s;

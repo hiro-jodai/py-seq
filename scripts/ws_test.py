@@ -117,6 +117,13 @@ async def main():
         await ws.send(json.dumps({"type": "track_remove", "index": 4}))
         s = await recv_until(ws, lambda m: m["type"] == "state" and len(m["tracks"]) == 4)
         print("track remove OK")
+
+        # drum map mode
+        await ws.send(json.dumps({"type": "set_track_drum", "track": 0, "on": True}))
+        s = await recv_until(ws, lambda m: m["type"] == "state" and m["tracks"][0]["drum"] is True)
+        await ws.send(json.dumps({"type": "set_track_drum", "track": 0, "on": False}))
+        s = await recv_until(ws, lambda m: m["type"] == "state" and m["tracks"][0]["drum"] is False)
+        print("drum map mode OK")
         await ws.send(json.dumps({"type": "toggle_follow"}))
         s = await recv_until(ws, lambda m: m["type"] == "state" and m.get("follow") is False)
         await ws.send(json.dumps({"type": "toggle_follow"}))

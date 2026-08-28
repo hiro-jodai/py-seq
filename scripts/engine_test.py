@@ -234,4 +234,21 @@ print("note length: duration = %.3fs (expect ~0.425s = 4 steps x 0.125 x 0.85)" 
 assert 0.35 < dur < 0.55, dur
 print("note length OK")
 
-print("ALL ENGINE v0.5.1 TESTS PASSED")
+# ------------------------------------------------------------- drum map mode
+seq11 = Sequencer(virtual=True, bpm=120, bars=1)
+seq11.set_track_drum(0, True)
+assert seq11.get_state()["tracks"][0]["drum"] is True
+seq11.set_track_drum(0, False)
+assert seq11.get_state()["tracks"][0]["drum"] is False
+# drum-map track still plays explicit notes on its channel
+seq11.set_track_drum(0, True)
+seq11.set_step_note(0, 0, 0, 36, length=1)   # Kick on CH1 (0-based ch 0)
+seq11.out = TimedMockOut()
+m11 = seq11.out
+seq11.play()
+time.sleep(0.4)
+seq11.stop()
+kick_ons = [x for x in m11.msgs if x[1].type == "note_on" and x[1].channel == 0 and x[1].note == 36]
+assert kick_ons, "drum pad note 36 should fire on CH1"
+print("drum map toggle + pad note OK")
+print("ALL ENGINE v0.6.4 TESTS PASSED")
