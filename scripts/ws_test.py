@@ -126,6 +126,11 @@ async def main():
         s = await recv_until(ws, lambda m: m["type"] == "state" and len(m["tracks"]) == 4)
         print("drum track preset OK")
 
+        # test note (debug trigger; expect a state echo, no crash)
+        await ws.send(json.dumps({"type": "test_note", "track": 0}))
+        s = await recv_until(ws, lambda m: m["type"] == "state")
+        print("test note OK")
+
         # drum map mode
         await ws.send(json.dumps({"type": "set_track_drum", "track": 0, "on": True}))
         s = await recv_until(ws, lambda m: m["type"] == "state" and m["tracks"][0]["drum"] is True)

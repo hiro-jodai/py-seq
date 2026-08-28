@@ -305,4 +305,17 @@ assert tr.note == 36                        # pad 36 = Kick
 st = seq13.get_state()["tracks"][-1]
 assert st["channel"] == 10 and st["drum"] is True and st["note"] == 36, st
 print("drum track preset OK")
-print("ALL ENGINE v0.6.7 TESTS PASSED")
+
+# ------------------------------------------------------------- test note
+seq14 = Sequencer(virtual=True, bpm=120, bars=1)
+seq14.set_track_channel(0, 10)   # CH10
+seq14.out = TimedMockOut()
+m14 = seq14.out
+seq14.test_note(0)
+time.sleep(0.3)
+ons = [x for x in m14.msgs if x[1].type == "note_on"]
+offs = [x for x in m14.msgs if x[1].type == "note_off"]
+assert len(ons) == 1 and len(offs) == 1, (len(ons), len(offs))
+assert ons[0][1].channel == 9 and ons[0][1].note == 36, (ons[0][1].channel, ons[0][1].note)
+print("test note OK (CH10 note 36)")
+print("ALL ENGINE v0.6.8 TESTS PASSED")

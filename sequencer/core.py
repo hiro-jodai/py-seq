@@ -229,6 +229,26 @@ class Sequencer:
         except Exception:
             pass
 
+    def test_note(self, track):
+        """Fire one note on a track immediately (debug / sanity check)."""
+        if not (0 <= track < len(self.tracks)):
+            return
+        tr = self.tracks[track]
+        note = tr.note
+        port = self._port_for(tr)
+        if port is None:
+            return
+        try:
+            port.send(mido.Message("note_on", channel=tr.channel, note=note, velocity=tr.velocity))
+        except Exception:
+            return
+
+        def _off():
+            time.sleep(0.2)
+            self._send_note_off(tr, note)
+
+        threading.Thread(target=_off, daemon=True).start()
+
     def _all_ports(self):
         ports = []
         if self.out is not None:

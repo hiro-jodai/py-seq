@@ -136,6 +136,8 @@ def build_app(seq: Sequencer, web_dir, midi_in=None):
             seq.add_track()
         elif t == "track_add_drum":
             seq.add_drum_track()
+        elif t == "test_note":
+            seq.test_note(msg.get("track", 0))
         elif t == "track_remove":
             seq.remove_track(msg.get("index", 0))
         elif t == "set_track_name":

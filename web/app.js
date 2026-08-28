@@ -158,6 +158,7 @@ function render() {
       <select class="tscale" title="scale"></select>
       <input class="tvel" type="number" min="1" max="127" value="${tr.velocity}" title="velocity">
       <button class="tdice" title="randomize pattern">🎲</button>
+      <button class="ttest" title="play one test note on this track (debug)">🎵</button>
       <button class="tpiano" title="piano roll for this track">🎹</button>
       <button class="tdel" title="remove track">🗑</button>
     `;
@@ -223,6 +224,7 @@ function render() {
     left.querySelector(".tvel").addEventListener("change", (e) =>
       send({ type: "param", param: `vel:${ti}`, value: parseInt(e.target.value) }));
     left.querySelector(".tdice").addEventListener("click", () => send({ type: "randomize_track", track: ti }));
+    left.querySelector(".ttest").addEventListener("click", () => send({ type: "test_note", track: ti }));
     left.querySelector(".tpiano").addEventListener("click", () => {
       pianoTrack = (pianoTrack === ti) ? -1 : ti;
       render();
