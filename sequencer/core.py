@@ -481,6 +481,7 @@ class Sequencer:
             return
         pitch = max(0, min(127, int(note)))
         notes = self.tracks[track].notes_of(cell) or []
+        was_empty = self.tracks[track].notes_of(cell) is None
         if pitch in notes:
             notes.remove(pitch)
         else:
@@ -489,11 +490,12 @@ class Sequencer:
         if notes:
             cell[0] = True
             cell[2] = notes
+            # only fresh notes take a length (adding to a chord keeps its length)
+            if length is not None and was_empty:
+                cell[3] = max(1, min(16, int(length)))
         else:
             cell[0] = False
             cell[2] = None
-        if length is not None:
-            cell[3] = max(1, min(16, int(length)))
 
     def set_step_length(self, track, bar, step, length):
         """Set how many steps a step's note sustains (1-16)."""

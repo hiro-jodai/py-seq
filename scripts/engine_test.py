@@ -120,6 +120,18 @@ assert chord_ons == [48, 55], chord_ons
 assert len(chord_offs) == 2, len(chord_offs)
 print("chord OK")
 
+# chord add must NOT reset the step's length
+seq12 = Sequencer(virtual=True, bpm=120, bars=1)
+bass = seq12.tracks[3]
+for b in range(len(bass.steps)):
+    for s in range(STEPS_PER_BAR):
+        bass.steps[b][s] = [False, 100, None, 1]
+seq12.set_step_note(3, 0, 0, 48, length=4)   # fresh C with LEN 4
+seq12.set_step_note(3, 0, 0, 52, length=1)   # add E with LEN 1 -> must NOT reset
+assert seq12.tracks[3].steps[0][0][3] == 4, seq12.tracks[3].steps[0][0][3]
+assert seq12.tracks[3].steps[0][0][2] == [48, 52]
+print("chord length preserved OK")
+
 # ---------------------------------------------------- stuck-note regression
 # swing 50 + notes on every step used to orphan note_offs (stuck notes)
 seq5 = Sequencer(virtual=True, bpm=120, bars=2)

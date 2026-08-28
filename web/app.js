@@ -33,7 +33,6 @@ let probMode = false;
 let pianoTrack = -1;   // track index showing the piano roll panel, -1 = off
 let pianoLen = 1;      // note length (in steps) used when placing piano-roll notes
 let drag = null;       // {track, step, len} while resizing a note's edge
-let suppressClick = false;  // true right after a real drag resize (swallow the click)
 let live = { bar: 0, step: -1, pattern: 0, songPos: -1 };
 let ws = null;
 
@@ -359,10 +358,17 @@ function buildPianoPanel(track) {
       c.dataset.step = s;
       if (state.playing && live.bar === state.edit_bar && live.step === s) c.classList.add("live");
       c.addEventListener("click", () => {
-        if (suppressClick) { suppressClick = false; return; }
         if (isStart) send({ type: "set_step_note", track, step: s, note: p });   // toggle off
-        else if (isTail) send({ type: "set_step_length", track, step: s, length: (st.length || 1) + 1 });
-        else send({ type: "set_step_note", track, step: s, note: p, length: pianoLen });
+        else if (isTail) {
+          const src = sources[`${p}:${s}`];
+          const srcStep = src !== undefined ? src : s;
+          send({ type: "set_step_length", track, step: srcStep, length: (tr.steps[srcStep].length || 1) + 1 });
+        }
+        else {
+          const msg = { type: "set_step_note", track, step: s, note: p };
+          if (notesOf(s).length === 0) msg.length = pianoLen;   // only fresh notes take LEN
+          send(msg);
+        }
       });
       c.addEventListener("contextmenu", (e) => {
         e.preventDefault();
@@ -385,7 +391,6 @@ function buildPianoPanel(track) {
             if (nextLen !== lastLen) {
               lastLen = nextLen;
               drag.len = nextLen;
-              suppressClick = true;   // a real resize happened: swallow the click
               refreshPiano();
             }
           };

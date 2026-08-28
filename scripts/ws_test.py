@@ -87,6 +87,14 @@ async def main():
         assert s["tracks"][3]["steps"][6]["notes"] == [50]
         print("set_step_length echo OK")
 
+        # chord add must not reset length
+        await ws.send(json.dumps({"type": "set_step_note", "track": 3, "step": 7, "note": 50, "length": 4}))
+        await recv_until(ws, lambda m: m["type"] == "state" and m["tracks"][3]["steps"][7].get("length") == 4)
+        await ws.send(json.dumps({"type": "set_step_note", "track": 3, "step": 7, "note": 53, "length": 1}))
+        s = await recv_until(ws, lambda m: m["type"] == "state" and m["tracks"][3]["steps"][7].get("notes") == [50, 53])
+        assert s["tracks"][3]["steps"][7]["length"] == 4, "chord add must keep length"
+        print("chord add keeps length OK")
+
         # midi learn plumbing
         await ws.send(json.dumps({"type": "midi_learn", "action": "swing"}))
         s = await recv_until(ws, lambda m: m["type"] == "state" and m.get("learn_mode") is True)
