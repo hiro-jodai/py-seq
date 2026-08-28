@@ -21,6 +21,9 @@ DEFAULT_BARS = 2
 NUM_PATTERNS = 4
 SONG_MAX = 16
 MAX_TRACKS = 16
+# Circuit Tracks (Novation) drum trigger notes per the Programmer's Reference
+# Guide V3 "Drum Notes Table": each drum track fires on a single MIDI note.
+CT_DRUM_NOTES = [60, 62, 64, 65]
 NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 PALETTE = [
     "#22d3ee", "#f472b6", "#fbbf24", "#a78bfa",
@@ -250,7 +253,7 @@ class Sequencer:
         threading.Thread(target=_off, daemon=True).start()
 
     def drum_scan(self, track):
-        """Fire notes 36-51 in sequence on a track (find which pads respond)."""
+        """Fire the Circuit Tracks drum trigger notes (60, 62, 64, 65) in sequence."""
         if not (0 <= track < len(self.tracks)):
             return
         tr = self.tracks[track]
@@ -259,12 +262,12 @@ class Sequencer:
             return
 
         def _scan():
-            for n in range(36, 52):
+            for n in CT_DRUM_NOTES:
                 try:
                     port.send(mido.Message("note_on", channel=tr.channel, note=n, velocity=tr.velocity))
-                    time.sleep(0.15)
+                    time.sleep(0.25)
                     port.send(mido.Message("note_off", channel=tr.channel, note=n, velocity=0))
-                    time.sleep(0.08)
+                    time.sleep(0.15)
                 except Exception:
                     break
 
@@ -669,12 +672,17 @@ class Sequencer:
         self.notify_state()
 
     def add_drum_track(self):
-        """Add a track preconfigured for Circuit Tracks drums: CH10 + drum map + pad 36."""
+        """Add a track preconfigured for Circuit Tracks drums.
+
+        Per the Programmer's Reference (Drum Notes Table), each drum track
+        is triggered by a single MIDI note on CH10: Drum 1=60, 2=62, 3=64, 4=65.
+        """
         if len(self.tracks) >= MAX_TRACKS:
             return
         idx = len(self.tracks)
+        note = CT_DRUM_NOTES[idx % len(CT_DRUM_NOTES)]
         for pat in self.patterns:
-            t = Track(f"DRUM{idx + 1}", 9, 36, 100)   # CH10 (0-based 9), pad 36 = Kick
+            t = Track(f"DRUM{(idx % 4) + 1}", 9, note, 100)   # CH10 (0-based 9)
             t.drum_mode = True
             pat.tracks.append(t)
         self.track_colors.append(PALETTE[len(self.track_colors) % len(PALETTE)])

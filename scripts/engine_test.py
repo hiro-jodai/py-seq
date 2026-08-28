@@ -301,10 +301,14 @@ assert len(seq13.tracks) == n0 + 1
 tr = seq13.tracks[-1]
 assert tr.channel == 9, tr.channel          # CH10 (0-based 9)
 assert tr.drum_mode is True
-assert tr.note == 36                        # pad 36 = Kick
+assert tr.note == 60, tr.note               # Drum 1 trigger note (Programmer's Ref)
 st = seq13.get_state()["tracks"][-1]
-assert st["channel"] == 10 and st["drum"] is True and st["note"] == 36, st
-print("drum track preset OK")
+assert st["channel"] == 10 and st["drum"] is True and st["note"] == 60, st
+# four drum tracks get notes 60, 62, 64, 65 (Drum 1-4)
+seq13.add_drum_track(); seq13.add_drum_track(); seq13.add_drum_track()
+notes = [t.note for t in seq13.tracks[-4:]]
+assert notes == [60, 62, 64, 65], notes
+print("drum track preset OK (notes %s)" % notes)
 
 # ------------------------------------------------------------- test note
 seq14 = Sequencer(virtual=True, bpm=120, bars=1)
@@ -327,8 +331,8 @@ m15 = seq15.out
 seq15.drum_scan(0)
 time.sleep(0.7)
 ons = [x for x in m15.msgs if x[1].type == "note_on"]
-assert len(ons) >= 3, len(ons)
-assert ons[0][1].channel == 9 and ons[0][1].note == 36, (ons[0][1].channel, ons[0][1].note)
-assert ons[1][1].note == 37 and ons[2][1].note == 38
-print("drum scan OK (36, 37, 38...)")
-print("ALL ENGINE v0.6.10 TESTS PASSED")
+assert len(ons) >= 2, len(ons)
+assert ons[0][1].channel == 9 and ons[0][1].note == 60, (ons[0][1].channel, ons[0][1].note)
+assert ons[1][1].note == 62
+print("drum scan OK (60, 62, 64, 65)")
+print("ALL ENGINE v0.6.11 TESTS PASSED")

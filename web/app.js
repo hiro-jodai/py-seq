@@ -376,10 +376,9 @@ function renderLive() {
 /* --------------------------------------------------------------- piano roll */
 function buildPianoPanel(track) {
   const tr = state.tracks[track];
-  const drum = !!tr.drum;
   const root = tr.note;
-  const lo = drum ? 36 : root - 8;
-  const hi = drum ? 51 : root + 7;
+  const lo = root - 8;
+  const hi = root + 7;
   const lenOf = (s) => (drag && drag.step === s ? drag.len : (tr.steps[s].length || 1));
   const notesOf = (s) => (tr.steps[s].notes || []);
   // coverage[s] = pitches sounding at step s (start or tail)
@@ -404,7 +403,7 @@ function buildPianoPanel(track) {
   head.className = "piano-head";
   head.innerHTML = `
     <span class="piano-title" style="color:${tr.color}">🎹 PIANO — ${tr.name}</span>
-    <span class="dim">${drum ? "drum map 36-51 (Circuit Tracks pads)" : `root ${noteName(root)}`}</span>
+    <span class="dim">${tr.drum ? "drum track · CH10 · trigger note " + tr.note_name : `root ${noteName(root)}`}</span>
     <label class="dim">LEN <input id="pianoLen" type="number" min="1" max="16" value="${pianoLen}"></label>
     <span class="dim">click=add/remove note · right-click=delete · drag right edge=length</span>`;
   panel.appendChild(head);
@@ -414,8 +413,8 @@ function buildPianoPanel(track) {
     const row = document.createElement("div");
     row.className = "piano-row";
     const label = document.createElement("span");
-    label.className = "piano-label" + ((p === root && !drum) ? " root" : "");
-    label.textContent = drum ? `${p} ${padName(p)}` : noteName(p);
+    label.className = "piano-label" + (p === root ? " root" : "");
+    label.textContent = noteName(p);
     row.appendChild(label);
     for (let s = 0; s < 16; s++) {
       const st = tr.steps[s];
@@ -427,7 +426,7 @@ function buildPianoPanel(track) {
         + (isStart ? " on" : "")
         + (isTail ? " tail" : "")
         + (isHandle ? " handle" : "")
-        + ((p === root && !drum) ? " rootline" : "");
+        + (p === root ? " rootline" : "");
       c.style.setProperty("--c", tr.color);
       c.dataset.pitch = p;
       c.dataset.step = s;
