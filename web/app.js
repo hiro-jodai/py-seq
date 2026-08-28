@@ -13,6 +13,9 @@ const DRUM_NAMES = {
 };
 function padName(n) { return DRUM_NAMES[n] || noteName(n); }
 
+// Circuit Tracks drum trigger notes (Programmer's Reference: Drum Notes Table)
+const CT_DRUM_NOTES = { 60: "Drum 1", 62: "Drum 2", 64: "Drum 3", 65: "Drum 4" };
+
 const SCALES = [
   "chromatic", "minor_pentatonic", "major_pentatonic",
   "natural_minor", "natural_major", "blues", "whole_tone", "dorian",
@@ -55,6 +58,13 @@ function connect() {
       live.bar = msg.bar; live.step = msg.step;
       live.pattern = msg.pattern; live.songPos = msg.song_pos;
       renderLive();
+    }
+    else if (msg.type === "scan") {
+      const el = $("scanLabel");
+      if (el) {
+        el.textContent = msg.note === null ? ""
+          : `🔍 ${msg.note} (${noteName(msg.note)}) = ${CT_DRUM_NOTES[msg.note] || "?"}`;
+      }
     }
   };
   ws.onclose = () => setTimeout(connect, 1000);

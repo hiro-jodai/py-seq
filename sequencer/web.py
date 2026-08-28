@@ -45,6 +45,9 @@ def build_app(seq: Sequencer, web_dir, midi_in=None):
             }
         )
     )
+    seq.set_scan_listener(
+        lambda note: broadcast({"type": "scan", "note": note})
+    )
 
     def handle(msg):
         t = msg.get("type")

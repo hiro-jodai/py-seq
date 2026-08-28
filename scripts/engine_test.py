@@ -329,10 +329,17 @@ seq15.set_track_channel(0, 10)
 seq15.out = TimedMockOut()
 m15 = seq15.out
 seq15.drum_scan(0)
-time.sleep(0.7)
+time.sleep(1.5)
 ons = [x for x in m15.msgs if x[1].type == "note_on"]
-assert len(ons) >= 2, len(ons)
+assert len(ons) >= 3, len(ons)
 assert ons[0][1].channel == 9 and ons[0][1].note == 60, (ons[0][1].channel, ons[0][1].note)
 assert ons[1][1].note == 62
-print("drum scan OK (60, 62, 64, 65)")
-print("ALL ENGINE v0.6.11 TESTS PASSED")
+assert ons[2][1].note == 64
+# scan listener gets a notification per note
+seen = []
+seq15.set_scan_listener(lambda note: seen.append(note))
+seq15.drum_scan(0)
+time.sleep(1.0)
+assert 60 in seen and 62 in seen, seen
+print("drum scan OK (60, 62, 64, 65) + listener notifications")
+print("ALL ENGINE v0.6.12 TESTS PASSED")

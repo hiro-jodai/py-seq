@@ -127,6 +127,7 @@ class Sequencer:
 
         self._state_listeners = []
         self._step_listeners = []
+        self._scan_listeners = []
         self._midi_port_name = midi_port
         self._virtual = virtual
         self.out = None
@@ -142,6 +143,9 @@ class Sequencer:
     def set_step_listener(self, fn):
         self._step_listeners.append(fn)
 
+    def set_scan_listener(self, fn):
+        self._scan_listeners.append(fn)
+
     def notify_state(self):
         for fn in self._state_listeners:
             try:
@@ -153,6 +157,14 @@ class Sequencer:
         for fn in self._step_listeners:
             try:
                 fn(self.current_bar, self.current_step)
+            except Exception:
+                pass
+
+    def _notify_scan(self, note):
+        """note=None means the scan finished."""
+        for fn in self._scan_listeners:
+            try:
+                fn(note)
             except Exception:
                 pass
 
@@ -264,12 +276,14 @@ class Sequencer:
         def _scan():
             for n in CT_DRUM_NOTES:
                 try:
+                    self._notify_scan(n)
                     port.send(mido.Message("note_on", channel=tr.channel, note=n, velocity=tr.velocity))
                     time.sleep(0.25)
                     port.send(mido.Message("note_off", channel=tr.channel, note=n, velocity=0))
-                    time.sleep(0.15)
+                    time.sleep(0.35)
                 except Exception:
                     break
+            self._notify_scan(None)
 
         threading.Thread(target=_scan, daemon=True).start()
 

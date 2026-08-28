@@ -132,7 +132,8 @@ async def main():
         s = await recv_until(ws, lambda m: m["type"] == "state")
         print("test note OK")
 
-        # drum scan (36-51 sweep; expect a state echo, no crash)
+        # drum scan command accepted (scan notifications need a real MIDI port;
+        # verified at engine level with a mock out)
         await ws.send(json.dumps({"type": "drum_scan", "track": 0}))
         s = await recv_until(ws, lambda m: m["type"] == "state")
         print("drum scan OK")
