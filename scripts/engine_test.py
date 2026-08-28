@@ -29,12 +29,12 @@ seq2 = Sequencer(virtual=True, bpm=120, bars=1)
 seq2.set_swing(50)
 hat = seq2.tracks[2]
 for s in range(STEPS_PER_BAR):
-    hat.steps[0][s] = [True, 100]
+    hat.steps[0][s] = [True, 100, None]
 for tr in seq2.tracks:
     if tr is not hat:
         for b in range(len(tr.steps)):
             for s in range(STEPS_PER_BAR):
-                tr.steps[b][s] = [False, 100]
+                tr.steps[b][s] = [False, 100, None]
 seq2.out = TimedMockOut()
 m2 = seq2.out
 seq2.play()
@@ -74,4 +74,25 @@ pos = seq3._song_entry
 seq3.stop()
 print("song: after 1.3s -> pattern =", p_after, "| song_pos =", pos)
 assert p_after == 1 and pos == 1, "song should have advanced to entry 1"
-print("ALL ENGINE v0.2 TESTS PASSED")
+
+# ------------------------------------------------------------- piano roll notes
+seq4 = Sequencer(virtual=True, bpm=120, bars=1)
+bass = seq4.tracks[3]
+for b in range(len(bass.steps)):
+    for s in range(STEPS_PER_BAR):
+        bass.steps[b][s] = [False, 100, None]
+seq4.set_step_note(3, 0, 0, 48)   # C3 explicit
+seq4.set_step_note(3, 0, 2, 55)   # G3 explicit
+seq4.set_step_note(3, 0, 4, None)  # clear (should turn off)
+seq4.out = TimedMockOut()
+m4 = seq4.out
+seq4.play()
+time.sleep(0.7)
+seq4.stop()
+bass_notes = sorted(set(m[1].note for m in m4.msgs if m[1].type == "note_on" and m[1].channel == 3))
+print("piano roll: bass notes played =", bass_notes)
+assert bass_notes == [48, 55], bass_notes
+assert seq4.tracks[3].steps[0][4] == [False, 100, None], "cleared note should be off"
+print("piano roll OK")
+
+print("ALL ENGINE v0.4 TESTS PASSED")

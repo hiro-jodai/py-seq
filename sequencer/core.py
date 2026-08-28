@@ -28,7 +28,11 @@ def note_name(n):
 
 
 class Track:
-    """One sequencer lane: 32 bars x 16 steps, each step = [on, probability]."""
+    """One sequencer lane: 32 bars x 16 steps, each step = [on, probability, note].
+
+    note is None -> use the track's fixed note / scale-random logic.
+    note is an int -> that exact pitch plays for this step (piano roll).
+    """
 
     def __init__(self, name, channel, note, velocity=100):
         self.name = name
@@ -37,14 +41,14 @@ class Track:
         self.velocity = velocity
         self.mode = "fixed"               # "fixed" | "scale"
         self.scale = "minor_pentatonic"
-        self.steps = [[[False, 100] for _ in range(STEPS_PER_BAR)] for _ in range(MAX_BARS)]
+        self.steps = [[[False, 100, None] for _ in range(STEPS_PER_BAR)] for _ in range(MAX_BARS)]
 
     def randomize(self, density=0.4):
         probs = [100, 100, 100, 80, 60, 50]
         for b in range(MAX_BARS):
             for s in range(STEPS_PER_BAR):
                 on = random.random() < density
-                self.steps[b][s] = [on, random.choice(probs) if on else 100]
+                self.steps[b][s] = [on, random.choice(probs) if on else 100, None]
 
 
 class Pattern:
@@ -276,12 +280,12 @@ class Sequencer:
                 self._send_note_off(ch, note)
                 del self._note_offs[ch]
         for tr in self.tracks:
-            on, prob = tr.steps[bar][step]
+            on, prob, step_note = tr.steps[bar][step]
             if not on:
                 continue
             if random.random() * 100.0 >= prob:
                 continue
-            note = self._pick_note(tr)
+            note = step_note if step_note is not None else self._pick_note(tr)
             vel = self._pick_velocity(tr)
             self._send_note_on(tr.channel, note, vel)
             self._note_offs[tr.channel] = (note, now + step_dur * self.note_length)
@@ -390,6 +394,16 @@ class Sequencer:
         if 0 <= track < len(self.tracks) and 0 <= bar < MAX_BARS and 0 <= step < STEPS_PER_BAR:
             self.tracks[track].steps[bar][step][0] = bool(on)
 
+    def set_step_note(self, track, bar, step, note):
+        """Piano roll: set (or clear) an explicit pitch for one step."""
+        if 0 <= track < len(self.tracks) and 0 <= bar < MAX_BARS and 0 <= step < STEPS_PER_BAR:
+            if note is None:
+                self.tracks[track].steps[bar][step][0] = False
+                self.tracks[track].steps[bar][step][2] = None
+            else:
+                self.tracks[track].steps[bar][step][2] = max(0, min(127, int(note)))
+                self.tracks[track].steps[bar][step][0] = True
+
     def set_prob(self, track, bar, step, prob):
         if 0 <= track < len(self.tracks) and 0 <= bar < MAX_BARS and 0 <= step < STEPS_PER_BAR:
             prob = max(0, min(100, int(prob)))
@@ -465,7 +479,11 @@ class Sequencer:
         tracks = []
         for i, tr in enumerate(self.tracks):
             steps = [
-                {"on": tr.steps[self.edit_bar][s][0], "prob": tr.steps[self.edit_bar][s][1]}
+                {
+                    "on": tr.steps[self.edit_bar][s][0],
+                    "prob": tr.steps[self.edit_bar][s][1],
+                    "note": tr.steps[self.edit_bar][s][2],
+                }
                 for s in range(STEPS_PER_BAR)
             ]
             tracks.append({
@@ -508,14 +526,14 @@ class Sequencer:
         pat = self.patterns[0]
         kick = pat.tracks[0]
         for s in (0, 4, 8, 12):
-            kick.steps[0][s] = [True, 100]
+            kick.steps[0][s] = [True, 100, None]
         snare = pat.tracks[1]
         for s in (4, 12):
-            snare.steps[0][s] = [True, 100]
+            snare.steps[0][s] = [True, 100, None]
         hat = pat.tracks[2]
         for s in range(STEPS_PER_BAR):
-            hat.steps[0][s] = [True, 40 if s % 4 == 0 else 100]
+            hat.steps[0][s] = [True, 40 if s % 4 == 0 else 100, None]
         bass = pat.tracks[3]
         bass.mode = "scale"
-        bass.steps[0][0] = [True, 100]
-        bass.steps[0][10] = [True, 75]
+        bass.steps[0][0] = [True, 100, None]
+        bass.steps[0][10] = [True, 75, None]

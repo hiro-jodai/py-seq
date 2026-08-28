@@ -30,6 +30,7 @@ const MIDI_ACTIONS = [
 
 let state = null;
 let probMode = false;
+let pianoTrack = -1;   // track index showing the piano roll panel, -1 = off
 let live = { bar: 0, step: -1, pattern: 0, songPos: -1 };
 let ws = null;
 
@@ -139,6 +140,7 @@ function render() {
       <select class="tscale" title="scale"></select>
       <input class="tvel" type="number" min="1" max="127" value="${tr.velocity}" title="velocity">
       <button class="tdice" title="randomize pattern">🎲</button>
+      <button class="tpiano" title="piano roll for this track">🎹</button>
     `;
     const noteSel = left.querySelector(".tnote");
     for (let n = 0; n <= 127; n++) {
@@ -173,6 +175,11 @@ function render() {
     left.querySelector(".tvel").addEventListener("change", (e) =>
       send({ type: "param", param: `vel:${ti}`, value: parseInt(e.target.value) }));
     left.querySelector(".tdice").addEventListener("click", () => send({ type: "randomize_track", track: ti }));
+    left.querySelector(".tpiano").addEventListener("click", () => {
+      pianoTrack = (pianoTrack === ti) ? -1 : ti;
+      render();
+    });
+    left.querySelector(".tpiano").classList.toggle("active", pianoTrack === ti);
 
     const cells = document.createElement("div");
     cells.className = "cells";
@@ -183,7 +190,8 @@ function render() {
       c.style.opacity = st.on ? 0.45 + 0.55 * (st.prob / 100) : 1;
       c.dataset.track = ti;
       c.dataset.step = si;
-      c.innerHTML = `<span class="prob">${st.prob}%</span>`;
+      c.innerHTML = st.note != null ? `<span class="prob">${noteName(st.note)}</span>` : `<span class="prob">${st.prob}%</span>`;
+      c.title = st.note != null ? `note ${noteName(st.note)} · prob ${st.prob}%` : `prob ${st.prob}%`;
       c.addEventListener("click", () => {
         if (probMode) {
           const p = parseInt($("probSlider").value);
@@ -199,6 +207,11 @@ function render() {
     row.appendChild(cells);
     grid.appendChild(row);
   });
+
+  // piano roll panel for the focused track
+  if (pianoTrack >= 0 && pianoTrack < state.tracks.length) {
+    grid.appendChild(renderPiano(pianoTrack));
+  }
 
   // song row
   const songRow = document.createElement("div");
@@ -248,6 +261,48 @@ function renderLive() {
     });
   }
   $("posLabel").textContent = state.playing ? `${live.bar + 1}:${live.step + 1}` : "--";
+}
+
+/* --------------------------------------------------------------- piano roll */
+function renderPiano(track) {
+  const tr = state.tracks[track];
+  const root = tr.note;
+  const lo = root - 8, hi = root + 7;
+  const panel = document.createElement("div");
+  panel.className = "piano-panel";
+  const head = document.createElement("div");
+  head.className = "piano-head";
+  head.innerHTML = `
+    <span class="piano-title" style="color:${TRACK_COLORS[track]}">🎹 PIANO — ${tr.name}</span>
+    <span class="dim">root ${noteName(root)} · click=set note / click again=clear · probはstepグリッドで調整</span>`;
+  panel.appendChild(head);
+  const grid = document.createElement("div");
+  grid.className = "piano-grid";
+  for (let p = hi; p >= lo; p--) {
+    const row = document.createElement("div");
+    row.className = "piano-row";
+    const label = document.createElement("span");
+    label.className = "piano-label" + (p === root ? " root" : "");
+    label.textContent = noteName(p);
+    row.appendChild(label);
+    for (let s = 0; s < 16; s++) {
+      const st = tr.steps[s];
+      const c = document.createElement("div");
+      c.className = "piano-cell" + (st.note === p ? " on" : "") + (p === root ? " rootline" : "");
+      c.style.setProperty("--c", TRACK_COLORS[track]);
+      c.dataset.pitch = p;
+      c.dataset.step = s;
+      if (state.playing && live.bar === state.edit_bar && live.step === s) c.classList.add("live");
+      c.addEventListener("click", () => {
+        if (st.note === p) send({ type: "set_step_note", track, step: s, note: null });
+        else send({ type: "set_step_note", track, step: s, note: p });
+      });
+      row.appendChild(c);
+    }
+    grid.appendChild(row);
+  }
+  panel.appendChild(grid);
+  return panel;
 }
 
 /* --------------------------------------------------------------- controls */

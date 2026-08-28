@@ -65,6 +65,16 @@ async def main():
         await recv_until(ws, lambda m: m["type"] == "state" and m["song_on"] is False)
         print("song off OK")
 
+        # piano roll note roundtrip
+        await ws.send(json.dumps({"type": "set_step_note", "track": 3, "step": 5, "note": 55}))
+        s = await recv_until(ws, lambda m: m["type"] == "state" and m["tracks"][3]["steps"][5].get("note") == 55)
+        assert s["tracks"][3]["steps"][5]["on"] is True
+        print("set_step_note echo OK")
+        await ws.send(json.dumps({"type": "set_step_note", "track": 3, "step": 5, "note": None}))
+        s = await recv_until(ws, lambda m: m["type"] == "state" and m["tracks"][3]["steps"][5].get("note") is None)
+        assert s["tracks"][3]["steps"][5]["on"] is False
+        print("set_step_note clear OK")
+
         # midi learn plumbing
         await ws.send(json.dumps({"type": "midi_learn", "action": "swing"}))
         s = await recv_until(ws, lambda m: m["type"] == "state" and m.get("learn_mode") is True)
