@@ -407,6 +407,11 @@ class Sequencer:
         if 0 <= track < len(self.tracks):
             self.tracks[track].note = max(0, min(127, int(note)))
 
+    def set_track_channel(self, track, channel):
+        """channel is 1-16 (UI convention); stored 0-based."""
+        if 0 <= track < len(self.tracks):
+            self.tracks[track].channel = max(0, min(15, int(channel) - 1))
+
     def set_track_vel(self, track, vel):
         if 0 <= track < len(self.tracks):
             self.tracks[track].velocity = max(1, min(127, int(vel)))

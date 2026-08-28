@@ -133,6 +133,7 @@ function render() {
     left.className = "track-ctl";
     left.innerHTML = `
       <span class="tname" style="color:${TRACK_COLORS[ti]}">${tr.name}</span>
+      <select class="tchan" title="MIDI channel (1-16)"></select>
       <select class="tnote" title="note"></select>
       <button class="tmode" title="fixed / scale-random">${tr.mode === "scale" ? "RND" : "FX"}</button>
       <select class="tscale" title="scale"></select>
@@ -147,6 +148,14 @@ function render() {
       noteSel.appendChild(opt);
     }
     noteSel.value = tr.note;
+    const chanSel = left.querySelector(".tchan");
+    for (let c = 1; c <= 16; c++) {
+      const opt = document.createElement("option");
+      opt.value = c;
+      opt.textContent = "CH" + c;
+      chanSel.appendChild(opt);
+    }
+    chanSel.value = tr.channel;
     const scaleSel = left.querySelector(".tscale");
     SCALES.forEach((sc) => {
       const opt = document.createElement("option");
@@ -157,6 +166,7 @@ function render() {
     scaleSel.value = tr.scale;
 
     noteSel.addEventListener("change", (e) => send({ type: "param", param: `note:${ti}`, value: parseInt(e.target.value) }));
+    chanSel.addEventListener("change", (e) => send({ type: "set_track_channel", track: ti, channel: parseInt(e.target.value) }));
     left.querySelector(".tmode").addEventListener("click", () =>
       send({ type: "set_track_mode", track: ti, mode: tr.mode === "scale" ? "fixed" : "scale" }));
     scaleSel.addEventListener("change", (e) => send({ type: "set_track_scale", track: ti, scale: e.target.value }));

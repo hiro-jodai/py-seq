@@ -113,6 +113,8 @@ def build_app(seq: Sequencer, web_dir, midi_in=None):
             )
         elif t == "set_track_note":
             seq.set_track_note(msg.get("track", 0), msg.get("note", 36))
+        elif t == "set_track_channel":
+            seq.set_track_channel(msg.get("track", 0), msg.get("channel", 1))
         elif t == "set_track_vel":
             seq.set_track_vel(msg.get("track", 0), msg.get("velocity", 100))
         elif t == "set_track_mode":
