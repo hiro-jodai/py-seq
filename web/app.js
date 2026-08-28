@@ -66,6 +66,8 @@ function send(obj) {
 /* ------------------------------------------------------------------ render */
 function render() {
   if (!state) return;
+  // remember which track control has focus so FOLLOW re-renders don't steal it
+  const focus = captureFocus();
   $("playBtn").textContent = state.playing ? "■" : "▶";
   $("playBtn").classList.toggle("playing", state.playing);
   $("bpmInput").value = state.bpm;
@@ -316,7 +318,31 @@ function render() {
   }
   songRow.appendChild(songCells);
   grid.appendChild(songRow);
+  restoreFocus(focus);
   renderLive();
+}
+
+function captureFocus() {
+  const act = document.activeElement;
+  if (!act || !act.closest) return null;
+  const row = act.closest(".track");
+  if (!row || row.classList.contains("song-row") || row.classList.contains("add-track-row") || !row.parentElement) return null;
+  const rows = [...row.parentElement.querySelectorAll(".track:not(.song-row):not(.add-track-row)")];
+  const ti = rows.indexOf(row);
+  if (ti < 0) return null;
+  if (act.tagName === "SELECT" || act.tagName === "INPUT") {
+    return { track: ti, cls: act.className };
+  }
+  return null;
+}
+
+function restoreFocus(f) {
+  if (!f) return;
+  const rows = $("grid").querySelectorAll(".track:not(.song-row):not(.add-track-row)");
+  const row = rows[f.track];
+  if (!row) return;
+  const el = row.querySelector("." + f.cls);
+  if (el) { try { el.focus({ preventScroll: true }); } catch (e) { try { el.focus(); } catch (_) {} } }
 }
 
 function renderLive() {

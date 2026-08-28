@@ -31,15 +31,15 @@ button:hover { border-color: var(--accent); color: var(--accent); }
 button.active { background: var(--accent); color: #06121a; border-color: var(--accent); }
 button.big { font-size: 18px; min-width: 52px; }
 #playBtn {
-  width: 76px;
-  height: 76px;
+  width: 52px;
+  height: 52px;
   border-radius: 50%;
-  font-size: 32px;
+  font-size: 22px;
   font-weight: 700;
   border: 2px solid var(--border);
   color: #fff;
   background: linear-gradient(145deg, #1e8e5a, #14532d);
-  box-shadow: 0 4px 14px rgba(30, 142, 90, .35);
+  box-shadow: 0 3px 10px rgba(30, 142, 90, .35);
   cursor: pointer;
   transition: transform .08s, box-shadow .15s, background .15s;
 }
